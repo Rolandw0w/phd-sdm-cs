@@ -1,7 +1,7 @@
 #ifndef data_writer_cpp
 #define data_writer_cpp
 
-#include "data_writer.h"
+#include "data_writer.hpp"
 
 
 void save_image_bmp(char* file_name, int w, int h, bool* bits)

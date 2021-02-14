@@ -1,7 +1,7 @@
 #ifndef image_writer_cpp
 #define image_writer_cpp
 
-#include "image_writer.h"
+#include "image_writer.hpp"
 
 
 #ifdef _WIN32

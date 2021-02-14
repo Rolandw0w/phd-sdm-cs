@@ -9,11 +9,11 @@ add_executable(
         runners/cifar10_runner.cu
         runners/cifar10_runner.cuh
         data_ops/data_reader.cpp
-        data_ops/data_reader.h
+        data_ops/data_reader.hpp
         data_ops/data_writer.cpp
-        data_ops/data_writer.h
+        data_ops/data_writer.hpp
         data_ops/image_writer.cpp
-        data_ops/image_writer.h
+        data_ops/image_writer.hpp
         cuda/kernels.cuh
         runners/labels_runner.cu
         runners/labels_runner.cuh
@@ -23,7 +23,7 @@ add_executable(
         sdm/sdm_jaeckel.cuh
         sdm/sdm_labels.cuh
         utils/utils.cpp
-        utils/utils.h
+        utils/utils.hpp
 )
 set_source_files_properties(data_ops/data_reader.cpp PROPERTIES LANGUAGE CUDA)
 set_source_files_properties(data_ops/data_writer.cpp PROPERTIES LANGUAGE CUDA)

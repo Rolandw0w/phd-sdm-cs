@@ -2,7 +2,7 @@
 #define cifar10_runner_cuh
 
 #include "base_runner.cuh"
-#include "../data_ops/data_writer.h"
+#include "../data_ops/data_writer.hpp"
 #include "../sdm/sdm_jaeckel.cuh"
 
 namespace Runners

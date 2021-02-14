@@ -5,7 +5,7 @@
 #include <memory>
 #include <vector>
 
-#include "utils.h"
+#include "utils.hpp"
 
 
 uint hamming_distance(bool *x, bool *y, uint dim)

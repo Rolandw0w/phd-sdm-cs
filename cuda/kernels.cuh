@@ -15,7 +15,7 @@
 #include <vector>
 #include <Windows.h>
 
-#include "../utils/utils.h"
+#include "../utils/utils.hpp"
 
 
 template<typename cell_type, typename index_type>

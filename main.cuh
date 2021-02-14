@@ -5,9 +5,9 @@
 #include <random>
 #include <vector>
 
-#include "data_ops/data_reader.h"
-#include "data_ops/data_writer.h"
-#include "utils/utils.h"
+#include "data_ops/data_reader.hpp"
+#include "data_ops/data_writer.hpp"
+#include "utils/utils.hpp"
 
 #include "sdm/sdm_jaeckel.cuh"
 #include "sdm/sdm_labels.cuh"
