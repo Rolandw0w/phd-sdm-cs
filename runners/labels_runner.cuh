@@ -2,8 +2,8 @@
 #define labels_runner_cuh
 
 #include "base_runner.cuh"
-#include "data_writer.h"
-#include "sdm_labels.cuh"
+#include "../data_ops/data_writer.h"
+#include "../sdm/sdm_labels.cuh"
 
 namespace Runners
 {

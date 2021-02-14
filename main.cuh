@@ -5,15 +5,15 @@
 #include <random>
 #include <vector>
 
-#include "data_reader.h"
-#include "data_writer.h"
-#include "utils.h"
+#include "data_ops/data_reader.h"
+#include "data_ops/data_writer.h"
+#include "utils/utils.h"
 
-#include "sdm_jaeckel.cuh"
-#include "sdm_labels.cuh"
+#include "sdm/sdm_jaeckel.cuh"
+#include "sdm/sdm_labels.cuh"
 
-#include "cifar10_runner.cuh"
-#include "labels_runner.cuh"
+#include "runners/cifar10_runner.cuh"
+#include "runners/labels_runner.cuh"
 
 Runners::CIFAR10RunnerParameters* get_cifar10_parameters();
 Runners::LabelsRunnerParameters* get_labels_parameters();

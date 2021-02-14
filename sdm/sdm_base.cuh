@@ -1,7 +1,7 @@
 #ifndef sdm_base_cuh
 #define sdm_base_cuh
 
-#include "kernels.cuh"
+#include "../cuda/kernels.cuh"
 
 
 template<typename cell_type, typename index_type, typename summation_type>

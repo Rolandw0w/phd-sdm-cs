@@ -13,9 +13,9 @@
 #include <stdexcept>
 #include <time.h>
 #include <vector>
-#include <windows.h>
+#include <Windows.h>
 
-#include "utils.h"
+#include "../utils/utils.h"
 
 
 template<typename cell_type, typename index_type>
