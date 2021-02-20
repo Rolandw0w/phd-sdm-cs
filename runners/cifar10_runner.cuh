@@ -39,12 +39,9 @@ namespace Runners
 		report_map noisy_address(const uint error_bits);
 		report_map noisy_address_noisy_value(const uint error_bits);
 
-		void set_data(bool*** data) { this->data = *data; }
+		void set_data(bool*** d) { this->data = *d; }
 
-		void set_parameters(CIFAR10RunnerParameters* parameters) { this->parameters = parameters; }
-		CIFAR10RunnerParameters* get_parameters() { return this->parameters; }
-
-		//~CIFAR10Runner();
+		void set_parameters(CIFAR10RunnerParameters* params) { this->parameters = params; }
 	private:
 		bool** data;
 		CIFAR10RunnerParameters* parameters;

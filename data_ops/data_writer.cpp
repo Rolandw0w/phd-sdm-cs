@@ -4,7 +4,7 @@
 #include "data_writer.hpp"
 
 
-void save_image_bmp(char* file_name, int w, int h, bool* bits)
+void save_image_bmp(char* file_name, int w, int h, const bool* bits)
 {
 	char* bytes = (char*)malloc(w * h * 3);
 
@@ -19,7 +19,7 @@ void save_image_bmp(char* file_name, int w, int h, bool* bits)
 			byte = 0;
 		}
 	}
-	//stbi_write_bmp(file_name, w, h, 3, bytes);
+	// stbi_write_bmp(file_name, w, h, 3, bytes);
 	free(bytes);
 }
 

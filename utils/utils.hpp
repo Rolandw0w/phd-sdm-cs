@@ -7,6 +7,7 @@
 
 
 typedef unsigned int uint;
+typedef unsigned long ulong;
 
 // Distance functions
 uint hamming_distance(bool *x, bool *y, uint dim);

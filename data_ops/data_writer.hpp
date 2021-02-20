@@ -4,6 +4,6 @@
 #include "image_writer.hpp"
 
 
-void save_image_bmp(char* file_name, int w, int h, bool* bits);
+void save_image_bmp(char* file_name, int w, int h, const bool* bits);
 
 #endif // !data_writer_h

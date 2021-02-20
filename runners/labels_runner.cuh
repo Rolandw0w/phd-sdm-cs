@@ -46,9 +46,6 @@ namespace Runners
 		void set_data(bool*** d) { this->data = *d; }
 
 		void set_parameters(LabelsRunnerParameters* params) { this->parameters = params; }
-		LabelsRunnerParameters* get_parameters() { return this->parameters; }
-
-		//~CIFAR10Runner();
 	private:
 		bool** data;
 		LabelsRunnerParameters* parameters;

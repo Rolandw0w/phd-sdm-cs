@@ -10,11 +10,7 @@ typedef std::map<std::string, double> report_map;
 namespace Runners
 {
 	class BaseRunnerParameters {};
-	class BaseRunner
-	{
-	private:
-		BaseRunnerParameters* parameters;
-	};
+	class BaseRunner {};
 }
 
 

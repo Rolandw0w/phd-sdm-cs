@@ -291,6 +291,9 @@ void labels_bio_naive()
 
 int main(int argc, char** argv)
 {
+    if (argc == 0)
+        throw std::invalid_argument("Pass arguments!");
+
     // handle input arguments
     reports_root_dir = argv[1];
     data_root = argv[2];

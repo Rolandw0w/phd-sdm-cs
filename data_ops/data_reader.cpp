@@ -73,7 +73,6 @@ bool** get_labels(int labels_count, int image_num, std::string& data_root)
     std::string full_path = data_root + "\\labels.bin";
     const char* path = &full_path[0];
 
-	std::cout << path << std::endl;
 	FILE* fp = fopen(path, "rb");
 	fread(buffer, 1, image_num * label_size_bytes, fp);
 

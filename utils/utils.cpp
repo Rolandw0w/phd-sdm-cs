@@ -31,7 +31,7 @@ bool* strict_address_detector(const bool *value, uint dim)
 uint from_bits(const bool *bits, uint bits_num)
 {
 	uint number = 0;
-	for (int i = bits_num - 1; i >= 0; i--)
+	for (uint i = bits_num - 1; i >= 0; i--)
 	{
 		bool bit = bits[i];
 		if (bit)
