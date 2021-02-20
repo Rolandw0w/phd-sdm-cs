@@ -6,11 +6,12 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include "../utils/utils.hpp"
 
 bool* get_bits(char c);
 
-bool** get_cifar10_images(int image_num);
+bool** get_cifar10_images(int image_num, std::string& data_root);
 
-bool** get_labels(int labels_count, int image_num);
+bool** get_labels(int labels_count, int image_num, std::string& data_root);
 
 #endif // !data_reader_h

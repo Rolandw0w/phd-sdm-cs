@@ -3,7 +3,6 @@
 
 #include <iostream>
 #include "data_reader.hpp"
-#include <sys/stat.h>
 
 
 bool* get_bits(char c)
@@ -16,16 +15,14 @@ bool* get_bits(char c)
 	return bits;
 }
 
-bool** get_cifar10_images(int image_num)
+bool** get_cifar10_images(int image_num, std::string& data_root)
 {
 	const int image_size = 3072;
 	const int pixels = image_size / 3;
-	const int rows = 32;
-	const int row_size = pixels / rows;
-	const int columns = 32;
 	const int step = image_size + 1;
 
-	char* path = "D:\\PhD\\Code\\sdm\\sdm-cuda\\resources\\cifar10.bin";
+	std::string full_path = data_root + "\\cifar10.bin";
+	const char* path = &full_path[0];
 
 	FILE* fp = fopen(path, "rb");
 
@@ -64,7 +61,7 @@ bool** get_cifar10_images(int image_num)
 	return images;
 }
 
-bool** get_labels(int labels_count, int image_num)
+bool** get_labels(int labels_count, int image_num, std::string& data_root)
 {
 	int label_size_bits = labels_count + 8 - (labels_count % 8);
 	int label_size_bytes = label_size_bits / 8;
@@ -73,10 +70,12 @@ bool** get_labels(int labels_count, int image_num)
 
 	char* buffer = (char*)malloc(label_size_bytes * image_num * sizeof(char));
 
-	char* path = "C:\\Development\\PhD\\sdm-plots\\resources\\labels4.bin";
+    std::string full_path = data_root + "\\labels.bin";
+    const char* path = &full_path[0];
+
+	std::cout << path << std::endl;
 	FILE* fp = fopen(path, "rb");
 	fread(buffer, 1, image_num * label_size_bytes, fp);
-	int a = 2 + 3;
 
 	for (int i = 0; i < image_num; i++)
 	{

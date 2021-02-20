@@ -6,11 +6,9 @@
 #include <cuda_runtime_api.h>
 #include <curand.h>
 #include <curand_kernel.h>
-#include <device_functions.h>
 #include <device_launch_parameters.h>
 #include <iostream>
 #include <memory>
-#include <stdexcept>
 #include <time.h>
 #include <vector>
 #include <Windows.h>
@@ -47,15 +45,12 @@ __global__
 void init_labels(cell_type* cells, index_type* indices, bool* bits, uint K, uint L, uint M, uint N, int thread_count)
 {
 	int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
-	//curandState state;
-	//curand_init(thread_num, 0, 0, &state);
 
 
 	for (uint i = thread_num; i < N; i += thread_count)
 	{
 		for (uint j = 0; j < K; j++)
 		{
-			//indices[i * K + j] = (index_type)(L * curand_uniform(&state));
 			bits[i * K + j] = 1;
 		}
 
@@ -108,10 +103,8 @@ void get_activated_cells(index_type* indices, bool* bits, uint K, uint M, uint N
 		bool activated = is_activated(indices, bits, i, K, destination_address);
 		if (activated)
 		{
-			//printf("%i\n", i);
 			int old = atomicAdd(&counter[0], 1);
 			activated_indices[old] = i;
-			//printf("%i->%i\n", old, i);
 		}
 	}
 }
@@ -190,17 +183,6 @@ void permute(int* permutations, Array arr, Array permuted_array, uint length, in
 	for (int i = thread_num; i < length; i += thread_count)
 	{
 		permuted_array[i] = arr[permutations[i]];
-	}
-}
-
-template<typename Array>
-__global__
-void inverse_permute(int* permutations, Array array, Array permuted_array, uint length, int thread_count)
-{
-	int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
-	for (int i = thread_num; i < length; i += thread_count)
-	{
-		array[permutations[i]] = permuted_array[i];
 	}
 }
 

@@ -1,29 +1,25 @@
 #ifndef utils_h
 #define utils_h
 
-#include <math.h>
+#include <cmath>
 #include <random>
+#include <stdexcept>
 
 
 typedef unsigned int uint;
-
-enum ComputingDevice {
-	CPU,
-	GPU
-};
 
 // Distance functions
 uint hamming_distance(bool *x, bool *y, uint dim);
 
 // Address functions
-bool* strict_address_detector(bool *value, uint dim);
+bool* strict_address_detector(const bool *value, uint dim);
 
-uint from_bits(bool *bits, uint bits_num);
+uint from_bits(const bool *bits, uint bits_num);
 
 bool* to_bits(int num, uint dim);
 
-bool* noise(const bool* value, const uint length, double probability);
-bool* noise(const bool* value, const uint length, const uint error_num);
+bool* noise(const bool* value, uint length, double probability);
+bool* noise(const bool* value, uint length, uint error_num);
 
 
 template<typename T>

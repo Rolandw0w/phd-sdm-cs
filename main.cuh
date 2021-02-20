@@ -35,6 +35,6 @@ struct TestData
 };
 
 
-int main();
+int main(int argc, char** argv);
 
 #endif // !main_cuh

@@ -63,7 +63,7 @@ SDM_JAECKEL<cell_type, index_type, summation_type>::SDM_JAECKEL(uint K, uint L, 
 	cudaMalloc((void**)&bits, K * N * sizeof(bool));
 	cudaMalloc((void**)&cuda_permutations, M * sizeof(int));
 
-	init_jaeckel << <block_count, threads_per_block >> > (cells, indices, bits, K, L, M, N, thread_count);
+	init_jaeckel <<<block_count, threads_per_block>>> (cells, indices, bits, K, L, M, N, thread_count);
 }
 
 template<typename cell_type, typename index_type, typename summation_type>
@@ -101,7 +101,7 @@ bool* SDM_JAECKEL<cell_type, index_type, summation_type>::read(const bool* value
 
 	bool* cuda_result;
 	cudaMalloc((void**)&cuda_result, M * sizeof(bool));
-	permute << <block_count, threads_per_block >> > (cuda_permutations, cuda_value, cuda_permuted_value, M, thread_count);
+	permute <<<block_count, threads_per_block>>> (cuda_permutations, cuda_value, cuda_permuted_value, M, thread_count);
 
 	bool* cuda_address;
 	cudaMalloc((void **)&cuda_address, L * sizeof(bool));
@@ -109,7 +109,7 @@ bool* SDM_JAECKEL<cell_type, index_type, summation_type>::read(const bool* value
 
 	bool* cuda_permuted_address;
 	cudaMalloc((void **)&cuda_permuted_address, L * sizeof(bool));
-	permute << <block_count, threads_per_block >> > (cuda_permutations, cuda_address, cuda_permuted_address, M, thread_count);
+	permute <<<block_count, threads_per_block>>> (cuda_permutations, cuda_address, cuda_permuted_address, M, thread_count);
 
 	int* cuda_activation_counter;
 	cudaMalloc((void **)&cuda_activation_counter, sizeof(int));
@@ -118,22 +118,22 @@ bool* SDM_JAECKEL<cell_type, index_type, summation_type>::read(const bool* value
 	activation_counter[0] = 0;
 	cudaMemcpy(cuda_activation_counter, activation_counter, sizeof(int), cudaMemcpyHostToDevice);
 
-	get_activated_cells<cell_type, index_type, summation_type> << <block_count, threads_per_block >> >
+	get_activated_cells<cell_type, index_type, summation_type> <<<block_count, threads_per_block>>>
 		(indices, bits, K, M, N, thread_count, cuda_permuted_address, cuda_activation_indices, cuda_activation_counter);
 
 	cudaMemcpy(activation_counter, cuda_activation_counter, sizeof(int), cudaMemcpyDeviceToHost);
 	int activated_cells_number = activation_counter[0];
 
-	read_jaeckel<cell_type, index_type, summation_type> << <block_count, threads_per_block >> >
+	read_jaeckel<cell_type, index_type, summation_type> <<<block_count, threads_per_block>>>
 		(cells, cuda_activation_indices, M, thread_count, cuda_sum, activated_cells_number);
 
-	get_result<summation_type> << <block_count, threads_per_block >> >
+	get_result<summation_type> <<<block_count, threads_per_block>>>
 		(cuda_sum, cuda_permuted_value, M, thread_count);
 
 	cudaFree(cuda_activation_counter);
 	cudaMemset(cuda_sum, 0, M * sizeof(summation_type));
 
-	permute << <block_count, threads_per_block >> > (cuda_permutations, cuda_permuted_value, cuda_result, M, thread_count);
+	permute <<<block_count, threads_per_block>>> (cuda_permutations, cuda_permuted_value, cuda_result, M, thread_count);
 	bool* result = (bool*)malloc(M * sizeof(bool));
 	cudaMemcpy(result, cuda_result, M * sizeof(bool), cudaMemcpyDeviceToHost);
 
@@ -176,7 +176,7 @@ bool* SDM_JAECKEL<cell_type, index_type, summation_type>::read(const bool* value
 
 	bool* cuda_result;
 	cudaMalloc((void**)&cuda_result, M * sizeof(bool));
-	permute << <block_count, threads_per_block >> > (cuda_permutations, cuda_value, cuda_permuted_value, M, thread_count);
+	permute <<<block_count, threads_per_block>>> (cuda_permutations, cuda_value, cuda_permuted_value, M, thread_count);
 
 	for (int i = 0; i < iter_num; i++)
 	{
@@ -187,18 +187,18 @@ bool* SDM_JAECKEL<cell_type, index_type, summation_type>::read(const bool* value
 		activation_counter[0] = 0;
 		cudaMemcpy(cuda_activation_counter, activation_counter, sizeof(int), cudaMemcpyHostToDevice);
 
-		get_activated_cells<cell_type, index_type, summation_type> << <block_count, threads_per_block >> >
+		get_activated_cells<cell_type, index_type, summation_type> <<<block_count, threads_per_block>>>
 			(indices, bits, K, M, N, thread_count, cuda_permuted_value, cuda_activation_indices, cuda_activation_counter);
 		cudaDeviceSynchronize();
 
 		cudaMemcpy(activation_counter, cuda_activation_counter, sizeof(int), cudaMemcpyDeviceToHost);
 		int activated_cells_number = activation_counter[0];
 
-		read_jaeckel<cell_type, index_type, summation_type> << <block_count, threads_per_block >> >
+		read_jaeckel<cell_type, index_type, summation_type> <<<block_count, threads_per_block>>>
 			(cells, cuda_activation_indices, M, thread_count, cuda_sum, activated_cells_number);
 		cudaDeviceSynchronize();
 
-		get_result<summation_type> << <block_count, threads_per_block >> >
+		get_result<summation_type> <<<block_count, threads_per_block>>>
 			(cuda_sum, cuda_permuted_value, M, thread_count);
 		cudaDeviceSynchronize();
 
@@ -209,7 +209,7 @@ bool* SDM_JAECKEL<cell_type, index_type, summation_type>::read(const bool* value
 
 		cudaDeviceSynchronize();
 	}
-	permute << <block_count, threads_per_block >> > (cuda_permutations, cuda_permuted_value, cuda_result, M, thread_count);
+	permute <<<block_count, threads_per_block>>> (cuda_permutations, cuda_permuted_value, cuda_result, M, thread_count);
 	cudaDeviceSynchronize();
 	bool* result = (bool*)malloc(M * sizeof(bool));
 	cudaMemcpy(result, cuda_result, M * sizeof(bool), cudaMemcpyDeviceToHost);
@@ -252,7 +252,7 @@ void SDM_JAECKEL<cell_type, index_type, summation_type>::write(const bool *value
 
 	bool* cuda_permuted_value;
 	cudaMalloc((void **)&cuda_permuted_value, M * sizeof(bool));
-	permute << <block_count, threads_per_block >> > (cuda_permutations, cuda_value, cuda_permuted_value, M, thread_count);
+	permute <<<block_count, threads_per_block>>> (cuda_permutations, cuda_value, cuda_permuted_value, M, thread_count);
 
 	bool* cuda_address;
 	cudaMalloc((void **)&cuda_address, L * sizeof(bool));
@@ -260,11 +260,11 @@ void SDM_JAECKEL<cell_type, index_type, summation_type>::write(const bool *value
 
 	bool* cuda_permuted_address;
 	cudaMalloc((void **)&cuda_permuted_address, L * sizeof(bool));
-	permute << <block_count, threads_per_block >> > (cuda_permutations, cuda_address, cuda_permuted_address, M, thread_count);
+	permute <<<block_count, threads_per_block>>> (cuda_permutations, cuda_address, cuda_permuted_address, M, thread_count);
 
 	cell_type* cuda_to_add;
 	cudaMalloc((void **)&cuda_to_add, (M + 1) * sizeof(cell_type));
-	get_array_to_add << <block_count, threads_per_block >> > (cuda_permuted_value, cuda_to_add, M, times, thread_count);
+	get_array_to_add <<<block_count, threads_per_block>>> (cuda_permuted_value, cuda_to_add, M, times, thread_count);
 	cudaDeviceSynchronize();
 
 	int* cuda_activation_indices;
@@ -277,14 +277,14 @@ void SDM_JAECKEL<cell_type, index_type, summation_type>::write(const bool *value
 	activation_counter[0] = 0;
 	cudaMemcpy(cuda_activation_counter, activation_counter, sizeof(int), cudaMemcpyHostToDevice);
 
-	get_activated_cells<cell_type, index_type, summation_type> << <block_count, threads_per_block >> >
+	get_activated_cells<cell_type, index_type, summation_type> <<<block_count, threads_per_block>>>
 		(indices, bits, K, M, N, thread_count, cuda_permuted_address, cuda_activation_indices, cuda_activation_counter);
 	cudaDeviceSynchronize();
 
 	cudaMemcpy(activation_counter, cuda_activation_counter, sizeof(int), cudaMemcpyDeviceToHost);
 	int activated_cells_number = activation_counter[0];
 
-	write_jaeckel<cell_type, index_type> << <block_count, threads_per_block >> >
+	write_jaeckel<cell_type, index_type> <<<block_count, threads_per_block>>>
 		(cells, M, thread_count, cuda_to_add, cuda_activation_indices, activated_cells_number);
 	cudaDeviceSynchronize();
 
@@ -312,7 +312,7 @@ cell_type SDM_JAECKEL<cell_type, index_type, summation_type>::get_min_activation
 
 	for (uint i = 0; i < N; i++)
 	{
-		copy_chunk<cell_type> << <block_count, threads_per_block >> > (cells, cuda_cell, i*(M + 1), (M + 1), thread_count);
+		copy_chunk<cell_type> <<<block_count, threads_per_block>>> (cells, cuda_cell, i*(M + 1), (M + 1), thread_count);
 		cudaMemcpy(cell, cuda_cell, (M + 1) * sizeof(cell_type), cudaMemcpyDeviceToHost);
 
 		if (min > cell[M])
@@ -338,7 +338,7 @@ cell_type SDM_JAECKEL<cell_type, index_type, summation_type>::get_max_activation
 
 	for (uint i = 0; i < N; i++)
 	{
-		copy_chunk<cell_type> << <block_count, threads_per_block >> > (cells, cuda_cell, i*(M + 1), (M + 1), thread_count);
+		copy_chunk<cell_type> <<<block_count, threads_per_block>>> (cells, cuda_cell, i*(M + 1), (M + 1), thread_count);
 		cudaMemcpy(cell, cuda_cell, (M + 1) * sizeof(cell_type), cudaMemcpyDeviceToHost);
 
 		if (max < cell[M])
@@ -364,7 +364,7 @@ long SDM_JAECKEL<cell_type, index_type, summation_type>::get_activations_num()
 
 	for (uint i = 0; i < N; i++)
 	{
-		copy_chunk<cell_type> << <block_count, threads_per_block >> > (cells, cuda_cell, i*(M + 1), (M + 1), thread_count);
+		copy_chunk<cell_type> <<<block_count, threads_per_block>>> (cells, cuda_cell, i*(M + 1), (M + 1), thread_count);
 		cudaMemcpy(cell, cuda_cell, (M + 1) * sizeof(cell_type), cudaMemcpyDeviceToHost);
 
 		if (cell[M] != 0)
@@ -400,10 +400,10 @@ void SDM_JAECKEL<cell_type, index_type, summation_type>::print_state()
 
 	for (uint i = 0; i < 10; i++)
 	{
-		copy_chunk<index_type> << <block_count, threads_per_block >> > (indices, cuda_indices_mask, i*K, K, thread_count);
+		copy_chunk<index_type> <<<block_count, threads_per_block>>> (indices, cuda_indices_mask, i*K, K, thread_count);
 		cudaMemcpy(indices_mask, cuda_indices_mask, K * sizeof(index_type), cudaMemcpyDeviceToHost);
 
-		copy_chunk<bool> << <block_count, threads_per_block >> > (bits, cuda_bits_mask, i*K, K, thread_count);
+		copy_chunk<bool> <<<block_count, threads_per_block>>> (bits, cuda_bits_mask, i*K, K, thread_count);
 		cudaMemcpy(bits_mask, cuda_bits_mask, K * sizeof(bool), cudaMemcpyDeviceToHost);
 
 		std::cout << "[";
@@ -415,7 +415,7 @@ void SDM_JAECKEL<cell_type, index_type, summation_type>::print_state()
 
 		std::cout << "	---->	";
 
-		copy_chunk<cell_type> << <block_count, threads_per_block >> > (cells, cuda_cell, i*(M + 1), (M + 1), thread_count);
+		copy_chunk<cell_type> <<<block_count, threads_per_block>>> (cells, cuda_cell, i*(M + 1), (M + 1), thread_count);
 		cudaMemcpy(cell, cuda_cell, (M + 1) * sizeof(cell_type), cudaMemcpyDeviceToHost);
 		for (uint j = 0; j < 64; j++)
 		{

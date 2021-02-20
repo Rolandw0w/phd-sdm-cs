@@ -41,11 +41,11 @@ namespace Runners
 	class LabelsRunner : public BaseRunner
 	{
 	public:
-		report_map naive(const double confidence, const bool save_images = false, const std::string images_path = "");
+		report_map naive(const double confidence, const bool save_images = false, const std::string& images_path = "");
 
-		void set_data(bool*** data) { this->data = *data; }
+		void set_data(bool*** d) { this->data = *d; }
 
-		void set_parameters(LabelsRunnerParameters* parameters) { this->parameters = parameters; }
+		void set_parameters(LabelsRunnerParameters* params) { this->parameters = params; }
 		LabelsRunnerParameters* get_parameters() { return this->parameters; }
 
 		//~CIFAR10Runner();

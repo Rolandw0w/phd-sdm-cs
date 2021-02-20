@@ -7,11 +7,10 @@
 
 namespace Runners
 {
-	report_map LabelsRunner::naive(const double confidence, const bool save_images, const std::string images_path)
+	report_map LabelsRunner::naive(const double confidence, const bool save_images, const std::string& images_path)
 	{
 		report_map report;
-		LabelsRunnerParameters* parameters = this->get_parameters();
-		const int required_exact_bits = parameters->value_length * confidence;
+		const int required_exact_bits = (int) (parameters->value_length * confidence);
 
 		report["mask_length"] = parameters->mask_length;
 		report["value_length"] = parameters->value_length;
@@ -47,7 +46,7 @@ namespace Runners
 
 		long read_time_start = clock();
 
-		long all_bits = parameters->labels_count * parameters->image_count;
+		unsigned long all_bits = parameters->labels_count * parameters->image_count;
 		long incorrect_bits = 0;
 		long correct100 = 0;
 
@@ -58,9 +57,9 @@ namespace Runners
 		int one_diff = 0;
 
 		std::ofstream prediction;
-		std::string predict_home = "D:\\PhD\\Code\\predicts\\";
+		std::string predict_home = R"(D:\PhD\Code\predicts\)";
 		std::ofstream input;
-		std::string input_home = "D:\\PhD\\Code\\predicts\\input.txt";
+		std::string input_home = R"(D:\PhD\Code\predicts\input.txt)";
 
 		if (parameters->reading_type == ReadingType::BIOLOGICAL)
 		{
@@ -108,12 +107,12 @@ namespace Runners
 				correct100 += 1;
 			else if (dist == 1)
 			{
-				one_diff == 1;
+				one_diff += 1;
 			}
 
 			incorrect_bits += dist;
 
-			int exact_bits = parameters->labels_count - dist;
+			uint exact_bits = parameters->labels_count - dist;
 			exact_num += (exact_bits >= required_exact_bits) ? 1 : 0;
 			sum += dist;
 
@@ -124,11 +123,11 @@ namespace Runners
 				std::string input_path = images_path;
 				input_path.append(image_number);
 				input_path.append("_input.bmp");
-				save_image_bmp(strdup(input_path.c_str()), 32, 32, data[i]);
+				save_image_bmp(_strdup(input_path.c_str()), 32, 32, data[i]);
 
 				std::string output_path = images_path;
 				output_path.append("_output.bmp");
-				save_image_bmp(strdup(output_path.c_str()), 32, 32, remembered);
+				save_image_bmp(_strdup(output_path.c_str()), 32, 32, remembered);
 			}
 
 			free(remembered);

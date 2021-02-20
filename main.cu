@@ -8,8 +8,9 @@
 #include "main.cuh"
 
 
-std::string reports_root_dir = "D:\\PhD\\Code\\reports";
-//std::cout << reports_root_dir;
+std::string reports_root_dir;
+std::string data_root;
+
 
 Runners::CIFAR10RunnerParameters* get_cifar10_parameters()
 {
@@ -36,38 +37,29 @@ Runners::LabelsRunnerParameters* get_labels_parameters(ReadingType reading_type,
     const uint value_length = 651;
     const uint labels_count = 651;
     const uint cells_count = value_length*(value_length-1)/2;
-    Runners::LabelsRunnerParameters* labels_parameters = new Runners::LabelsRunnerParameters(image_count, block_count, threads_per_block,
-                                                                                             mask_length, cells_count, address_length, value_length, labels_count, reading_type, bio_threshold);
+    auto* labels_parameters = new Runners::LabelsRunnerParameters(image_count, block_count, threads_per_block,
+                                                                  mask_length, cells_count, address_length, value_length,
+                                                                  labels_count, reading_type, bio_threshold);
 
     return labels_parameters;
 }
 
 void print_report(report_map* report)
 {
-    for (auto elem : *report)
+    for (const auto& elem : *report)
     {
         std::cout << elem.first << "=" << elem.second << std::endl;
     }
     std::cout << std::endl;
 }
 
-void print_report_json(report_map* report)
-{
-    std::cout << "{" << std::endl;
-    for (auto elem : *report)
-    {
-        std::cout << "    \"" << elem.first << "\"" << ": " << elem.second << "," << std::endl;
-    }
-    std::cout << "}," << std::endl;
-}
-
 void save_report_vector_json(std::vector<report_map>* reports, std::ofstream& file)
 {
     file << "[" << std::endl;
-    for (auto report : *reports)
+    for (const auto& report : *reports)
     {
         file << "    {" << std::endl;
-        for (auto elem : report)
+        for (const auto& elem : report)
         {
             file << "        \"" << elem.first << "\"" << ": " << elem.second << "," << std::endl;
         }
@@ -84,12 +76,12 @@ void cifar10_naive()
     const uint mask_length_step = 1;
 
     Runners::CIFAR10RunnerParameters* cifar10_parameters = get_cifar10_parameters();
-    bool** data = get_cifar10_images(cifar10_parameters->image_count);
+    bool** data = get_cifar10_images(cifar10_parameters->image_count, data_root);
 
     std::vector<report_map> reports;
     for (uint mask_length = min_mask_length; mask_length <= max_mask_length; mask_length += mask_length_step)
     {
-        Runners::CIFAR10Runner cifar10_runner;
+        Runners::CIFAR10Runner cifar10_runner{};
         cifar10_parameters->mask_length = mask_length;
         cifar10_runner.set_parameters(cifar10_parameters);
         cifar10_runner.set_data(&data);
@@ -98,11 +90,11 @@ void cifar10_naive()
         reports.push_back(naive_report);
         print_report(&naive_report);
     }
-    std::ofstream myfile;
-    myfile.open(reports_root_dir + "\\naive.txt");
-    save_report_vector_json(&reports, myfile);
+    std::ofstream naive;
+    naive.open(reports_root_dir + "\\naive.txt");
+    save_report_vector_json(&reports, naive);
 
-    myfile.close();
+    naive.close();
     free(data);
 }
 
@@ -114,10 +106,10 @@ void cifar10_multiple_write()
     const uint write_count_step = 5;
 
     Runners::CIFAR10RunnerParameters* cifar10_parameters = get_cifar10_parameters();
-    Runners::CIFAR10Runner cifar10_runner;
+    Runners::CIFAR10Runner cifar10_runner{};
     cifar10_runner.set_parameters(cifar10_parameters);
 
-    bool** data = get_cifar10_images(cifar10_parameters->image_count);
+    bool** data = get_cifar10_images(cifar10_parameters->image_count, data_root);
     cifar10_runner.set_data(&data);
 
     std::vector<report_map> reports;
@@ -130,11 +122,11 @@ void cifar10_multiple_write()
         reports.push_back(multiple_write_report);
         print_report(&multiple_write_report);
     }
-    std::ofstream myfile;
-    myfile.open(reports_root_dir + "\\multiple_write.txt");
-    save_report_vector_json(&reports, myfile);
+    std::ofstream multiple_write;
+    multiple_write.open(reports_root_dir + "\\multiple_write.txt");
+    save_report_vector_json(&reports, multiple_write);
 
-    myfile.close();
+    multiple_write.close();
     free(data);
 }
 
@@ -147,10 +139,10 @@ void cifar10_iterative_read()
 
     Runners::CIFAR10RunnerParameters* cifar10_parameters = get_cifar10_parameters();
 
-    Runners::CIFAR10Runner cifar10_runner;
+    Runners::CIFAR10Runner cifar10_runner{};
     cifar10_runner.set_parameters(cifar10_parameters);
 
-    bool** data = get_cifar10_images(cifar10_parameters->image_count);
+    bool** data = get_cifar10_images(cifar10_parameters->image_count, data_root);
     cifar10_runner.set_data(&data);
 
     std::vector<report_map> reports;
@@ -160,11 +152,11 @@ void cifar10_iterative_read()
         reports.push_back(iterative_read_report);
         print_report(&iterative_read_report);
     }
-    std::ofstream myfile;
-    myfile.open(reports_root_dir + "\\iterative_read.txt");
-    save_report_vector_json(&reports, myfile);
+    std::ofstream iterative_read;
+    iterative_read.open(reports_root_dir + "\\iterative_read.txt");
+    save_report_vector_json(&reports, iterative_read);
 
-    myfile.close();
+    iterative_read.close();
     free(data);
 }
 
@@ -176,10 +168,10 @@ void cifar10_noisy_address()
 
     Runners::CIFAR10RunnerParameters* cifar10_parameters = get_cifar10_parameters();
 
-    Runners::CIFAR10Runner cifar10_runner;
+    Runners::CIFAR10Runner cifar10_runner{};
     cifar10_runner.set_parameters(cifar10_parameters);
 
-    bool** data = get_cifar10_images(cifar10_parameters->image_count);
+    bool** data = get_cifar10_images(cifar10_parameters->image_count, data_root);
     cifar10_runner.set_data(&data);
 
     std::vector<report_map> reports;
@@ -189,11 +181,11 @@ void cifar10_noisy_address()
         reports.push_back(noisy_address_report);
         print_report(&noisy_address_report);
     }
-    std::ofstream myfile;
-    myfile.open(reports_root_dir + "\\noisy_address.txt");
-    save_report_vector_json(&reports, myfile);
+    std::ofstream noisy_address;
+    noisy_address.open(reports_root_dir + "\\noisy_address.txt");
+    save_report_vector_json(&reports, noisy_address);
 
-    myfile.close();
+    noisy_address.close();
     free(data);
 }
 
@@ -205,10 +197,10 @@ void cifar10_noisy_address_noisy_value()
 
     Runners::CIFAR10RunnerParameters* cifar10_parameters = get_cifar10_parameters();
 
-    Runners::CIFAR10Runner cifar10_runner;
+    Runners::CIFAR10Runner cifar10_runner{};
     cifar10_runner.set_parameters(cifar10_parameters);
 
-    bool** data = get_cifar10_images(cifar10_parameters->image_count);
+    bool** data = get_cifar10_images(cifar10_parameters->image_count, data_root);
     cifar10_runner.set_data(&data);
 
     std::vector<report_map> reports;
@@ -218,11 +210,11 @@ void cifar10_noisy_address_noisy_value()
         reports.push_back(noisy_address_report);
         print_report(&noisy_address_report);
     }
-    std::ofstream myfile;
-    myfile.open(reports_root_dir + "\\noisy_address_noisy_value.txt");
-    save_report_vector_json(&reports, myfile);
+    std::ofstream noisy_address_noisy_value;
+    noisy_address_noisy_value.open(reports_root_dir + "\\noisy_address_noisy_value.txt");
+    save_report_vector_json(&reports, noisy_address_noisy_value);
 
-    myfile.close();
+    noisy_address_noisy_value.close();
     free(data);
 }
 
@@ -231,16 +223,7 @@ void labels_stat_naive()
     const int image_num = 9000;
     const int labels_count = 651;
 
-    bool** data = get_labels(labels_count, image_num);
-
-    //for (int i = 0; i < image_num; i++)
-    //{
-    //	for (int j = 0; j < labels_count; j++)
-    //	{
-    //		std::cout << data[i][j];
-    //	}
-    //	std::cout << std::endl;
-    //}
+    bool** data = get_labels(labels_count, image_num, data_root);
 
     const double confidence = 0.9;
     const uint min_mask_length = 2;
@@ -252,7 +235,7 @@ void labels_stat_naive()
     std::vector<report_map> reports;
     for (uint mask_length = min_mask_length; mask_length <= max_mask_length; mask_length += mask_length_step)
     {
-        Runners::LabelsRunner labels_runner;
+        Runners::LabelsRunner labels_runner{};
         labels_parameters->mask_length = mask_length;
         labels_runner.set_parameters(labels_parameters);
         labels_runner.set_data(&data);
@@ -261,11 +244,11 @@ void labels_stat_naive()
         reports.push_back(naive_report);
         print_report(&naive_report);
     }
-    std::ofstream myfile;
-    myfile.open(reports_root_dir + "\\labels_stat_naive.txt");
-    save_report_vector_json(&reports, myfile);
+    std::ofstream labels_stat_naive;
+    labels_stat_naive.open(reports_root_dir + "\\labels_stat_naive.txt");
+    save_report_vector_json(&reports, labels_stat_naive);
 
-    myfile.close();
+    labels_stat_naive.close();
     free(data);
     delete(labels_parameters);
 }
@@ -275,21 +258,9 @@ void labels_bio_naive()
     const int image_num = 9000;
     const int labels_count = 651;
 
-    bool** data = get_labels(labels_count, image_num);
-
-    //for (int i = 0; i < image_num; i++)
-    //{
-    //	for (int j = 0; j < labels_count; j++)
-    //	{
-    //		std::cout << data[i][j];
-    //	}
-    //	std::cout << std::endl;
-    //}
+    bool** data = get_labels(labels_count, image_num, data_root);
 
     const double confidence = 0.9;
-    const uint min_mask_length = 2;
-    const uint max_mask_length = 2;
-    const uint mask_length_step = 1;
 
     const double bio_thresholds[7] = {0.01, 0.1, 0.25, 0.5, 0.75, 0.9, 0.99};
 
@@ -300,7 +271,7 @@ void labels_bio_naive()
     {
         labels_parameters->bio_threshold = bio_threshold;
 
-        Runners::LabelsRunner labels_runner;
+        Runners::LabelsRunner labels_runner{};
         labels_runner.set_parameters(labels_parameters);
         labels_runner.set_data(&data);
 
@@ -309,39 +280,47 @@ void labels_bio_naive()
         print_report(&naive_report);
     }
 
-    std::ofstream myfile;
-    myfile.open(reports_root_dir + "\\labels_bio_naive.txt");
-    save_report_vector_json(&reports, myfile);
+    std::ofstream labels_bio_naive;
+    labels_bio_naive.open(reports_root_dir + "\\labels_bio_naive.txt");
+    save_report_vector_json(&reports, labels_bio_naive);
 
-    myfile.close();
+    labels_bio_naive.close();
     free(data);
     delete(labels_parameters);
 }
 
-int main()
+int main(int argc, char** argv)
 {
+    // handle input arguments
+    reports_root_dir = argv[1];
+    data_root = argv[2];
+    std::string experiment_num = argv[3];
+    int experiment_num_int = std::stoi(experiment_num);
+    if (experiment_num_int < 1 || experiment_num_int > 2)
+        throw std::invalid_argument("Only {1,2} experiments are available now");
 
     typedef std::pair < std::string, std::function<void(void)>> test_type;
     std::vector<test_type> tests;
-    tests.reserve(50);
+    tests.reserve(32);
 
-    //tests.push_back({ "Plain test with exact addresses", cifar10_naive });
+    if (experiment_num_int == 1)
+    {
+        tests.emplace_back("Plain test with exact addresses", cifar10_naive);
+        tests.emplace_back("Multiple write test", cifar10_multiple_write);
+        tests.emplace_back("Iterative read test", cifar10_iterative_read);
+        tests.emplace_back("Noisy address test", cifar10_noisy_address);
+        tests.emplace_back("Noisy address and noisy value test", cifar10_noisy_address_noisy_value);
+    }
+    if (experiment_num_int == 2)
+    {
+        tests.emplace_back( "Plain test with labels (stat)", labels_stat_naive );
+        tests.emplace_back( "Plain test with labels (bio)", labels_bio_naive );
+    }
 
-    //tests.push_back({ "Multiple write test", cifar10_multiple_write });
-
-    //tests.push_back({ "Iterative read test", cifar10_iterative_read });
-
-    //tests.push_back({ "Noisy address test", cifar10_noisy_address});
-
-    //tests.push_back({ "Noisy address and noisy value test", cifar10_noisy_address_noisy_value });
-
-    tests.push_back({ "Plain test with labels (stat)", labels_stat_naive });
-
-    tests.push_back({ "Plain test with labels (bio)", labels_bio_naive });
 
     std::cout.precision(6);
 
-    for (test_type pair : tests)
+    for (const test_type& pair : tests)
     {
         std::cout << pair.first << std::endl << std::endl;
         try

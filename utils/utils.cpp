@@ -13,14 +13,12 @@ uint hamming_distance(bool *x, bool *y, uint dim)
 	uint dist = 0;
 	for (uint d = 0; d < dim; d++)
 	{
-		bool xd = x[d];
-		bool yd = y[d];
 		dist += x[d] ^ y[d];
 	}
 	return dist;
 }
 
-bool* strict_address_detector(bool *value, uint dim)
+bool* strict_address_detector(const bool *value, uint dim)
 {
 	bool* address = (bool*)malloc(dim * sizeof(bool));
 	for (uint i = 0; i < dim; i++)
@@ -30,7 +28,7 @@ bool* strict_address_detector(bool *value, uint dim)
 	return address;
 }
 
-uint from_bits(bool *bits, uint bits_num)
+uint from_bits(const bool *bits, uint bits_num)
 {
 	uint number = 0;
 	for (int i = bits_num - 1; i >= 0; i--)
