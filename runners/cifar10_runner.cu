@@ -21,13 +21,6 @@ namespace Runners
 
 		SDM_JAECKEL<short, short, short> sdm(parameters->mask_length, parameters->address_length,
 			parameters->value_length, parameters->cells_count, parameters->block_count, parameters->threads_per_block);
-		int* permutations = (int*)malloc(parameters->value_length * sizeof(int));
-
-		for (uint i = 0; i < parameters->value_length; i++)
-		{
-			permutations[i] = i;
-		}
-		sdm.set_permutations(permutations);
 
 		long write_time_start = clock();
 
@@ -35,6 +28,7 @@ namespace Runners
 		{
 			sdm.write(data[i]);
 		}
+		std::cout << std::endl;
 
 		long write_time = clock() - write_time_start;
 
@@ -123,7 +117,6 @@ namespace Runners
         report.insert({"activated_cells_count", sdm.get_activations_num()});
 
 		sdm.~SDM_JAECKEL();
-		free(permutations);
 
 		return report;
 	}
@@ -144,13 +137,6 @@ namespace Runners
 
 		SDM_JAECKEL<short, short, short> sdm(parameters->mask_length, parameters->address_length,
 			parameters->value_length, parameters->cells_count, parameters->block_count, parameters->threads_per_block);
-		int* permutations = (int*)malloc(parameters->value_length * sizeof(int));
-
-		for (uint i = 0; i < parameters->value_length; i++)
-		{
-			permutations[i] = i;
-		}
-		sdm.set_permutations(permutations);
 
 		long write_time_start = clock();
 
@@ -230,7 +216,6 @@ namespace Runners
         report.insert({"max_activations", sdm.get_max_activations()});
         report.insert({"activated_cells_count", sdm.get_activations_num()});
 
-		free(permutations);
 		sdm.~SDM_JAECKEL();
 
 		return report;
@@ -258,13 +243,6 @@ namespace Runners
 
 		SDM_JAECKEL<short, short, short> sdm(parameters->mask_length, parameters->address_length,
 			parameters->value_length, parameters->cells_count, parameters->block_count, parameters->threads_per_block);
-		int* permutations = (int*)malloc(parameters->value_length * sizeof(int));
-
-		for (uint i = 0; i < parameters->value_length; i++)
-		{
-			permutations[i] = i;
-		}
-		sdm.set_permutations(permutations);
 
 		long write_time_start = clock();
 
@@ -339,7 +317,6 @@ namespace Runners
 		report.insert({"max_activations", sdm.get_max_activations()});
 		report.insert({"activated_cells_count", sdm.get_activations_num()});
 
-		free(permutations);
 		sdm.~SDM_JAECKEL();
 		free(noisy_data);
 
@@ -361,13 +338,6 @@ namespace Runners
 
 		SDM_JAECKEL<short, short, short> sdm(parameters->mask_length, parameters->address_length,
 			parameters->value_length, parameters->cells_count, parameters->block_count, parameters->threads_per_block);
-		int* permutations = (int*)malloc(parameters->value_length * sizeof(int));
-
-		for (uint i = 0; i < parameters->value_length; i++)
-		{
-			permutations[i] = i;
-		}
-		sdm.set_permutations(permutations);
 
 		long write_time_start = clock();
 
@@ -450,7 +420,6 @@ namespace Runners
 		report.insert({"max_activations", sdm.get_max_activations()});
 		report.insert({"activated_cells_count", sdm.get_activations_num()});
 
-		free(permutations);
 		sdm.~SDM_JAECKEL();
 
 		return report;
@@ -471,13 +440,6 @@ namespace Runners
 
 		SDM_JAECKEL<short, short, short> sdm(parameters->mask_length, parameters->address_length,
 			parameters->value_length, parameters->cells_count, parameters->block_count, parameters->threads_per_block);
-		int* permutations = (int*)malloc(parameters->value_length * sizeof(int));
-
-		for (uint i = 0; i < parameters->value_length; i++)
-		{
-			permutations[i] = i;
-		}
-		sdm.set_permutations(permutations);
 
 		long write_time_start = clock();
 
@@ -566,7 +528,6 @@ namespace Runners
 		report.insert({"max_activations", sdm.get_max_activations()});
 		report.insert({"activated_cells_count", sdm.get_activations_num()});
 
-		free(permutations);
 		sdm.~SDM_JAECKEL();
 
 		return report;

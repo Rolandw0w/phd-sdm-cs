@@ -91,5 +91,33 @@ bool** get_labels(int labels_count, int image_num, std::string& data_root)
 	return labels;
 }
 
+bool* get_cs1(int labels_count, int image_num, std::string& data_root)
+{
+    int label_size_bytes = labels_count / 8;
+
+    bool* cs1 = (bool*)malloc(labels_count * image_num * sizeof(bool));
+
+    char* buffer = (char*)malloc(label_size_bytes * image_num * sizeof(char));
+
+    std::string full_path = data_root + "\\cs1.bin";
+    const char* path = &full_path[0];
+
+    FILE* fp = fopen(path, "rb");
+    fread(buffer, 1, image_num * label_size_bytes, fp);
+
+    int index = 0;
+    for (int i = 0; i < image_num * label_size_bytes; i++)
+    {
+        char char_i = buffer[i];
+        bool* bits = get_bits(char_i);
+        for (int k = 0; k < 8; k++)
+        {
+            cs1[index] = bits[k];
+            index++;
+        }
+    }
+    return cs1;
+}
+
 
 #endif // !data_reader_cpp

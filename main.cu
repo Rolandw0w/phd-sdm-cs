@@ -27,7 +27,26 @@ Runners::CIFAR10RunnerParameters* get_cifar10_parameters()
     return &cifar10_parameters;
 }
 
-Runners::LabelsRunnerParameters* get_labels_parameters(ReadingType reading_type, double bio_threshold = 0.0)
+Runners::CS1RunnerParameters* get_cs1_parameters()
+{
+    const uint image_count = 9000;
+    const uint block_count = 64;
+    const uint threads_per_block = 512;
+    const uint bits_per_num = 4;
+    const uint mask_length = 18;
+    const uint labels_count = 600;
+    const uint target_count = 150;
+    const uint address_length = bits_per_num*target_count;
+    const uint value_length = bits_per_num*target_count;
+    const uint cells_count = 3*1000*1000;
+    auto* cs1_parameters = new Runners::CS1RunnerParameters(image_count, block_count, threads_per_block,
+                                                            mask_length, cells_count, address_length, value_length,
+                                                            labels_count, target_count, bits_per_num);
+
+    return cs1_parameters;
+}
+
+Runners::LabelsRunnerParameters* get_labels_parameters(ReadingType reading_type, double bio_threshold)
 {
     const uint image_count = 9000;
     const uint block_count = 32;
@@ -123,7 +142,7 @@ void cifar10_multiple_write()
         print_report(&multiple_write_report);
     }
     std::ofstream multiple_write;
-    multiple_write.open(reports_root_dir + "\\multiple_write.txt");
+    multiple_write.open(reports_root_dir + "\\cifar10_multiple_write.txt");
     save_report_vector_json(&reports, multiple_write);
 
     multiple_write.close();
@@ -289,6 +308,99 @@ void labels_bio_naive()
     delete(labels_parameters);
 }
 
+void cs1_naive_grid1()
+{
+    const int image_num = 9000;
+    const int labels_count = 600;
+
+    bool* data = get_cs1(labels_count, image_num, data_root);
+//    std::cout << std::endl;
+//    for (int i = 0; i < 1; i++)
+//    {
+//        for (int j = 0; j < labels_count; j++)
+//        {
+//            std::cout << data[j];
+//        }
+//    }
+//    std::cout << std::endl;
+
+    const double confidence = 0.9;
+
+    Runners::CS1RunnerParameters* cs1_parameters = get_cs1_parameters();
+
+    const uint min_mask_length = 2;
+    const uint max_mask_length = 32;
+    const uint mask_length_step = 1;
+
+    uint cells_counts[] = {50*1000, 100*1000, 250*1000, 500*1000, 750*1000, 1000*1000, 1250*1000, 1500*1000, 2000*1000};
+
+    std::vector<report_map> reports;
+    for (auto cells_count: cells_counts)
+    {
+        for (uint mask_length = min_mask_length; mask_length <= max_mask_length; mask_length += mask_length_step)
+        {
+            Runners::CS1Runner cs1_runner{};
+
+            cs1_parameters->mask_length = mask_length;
+            cs1_parameters->cells_count = cells_count;
+
+            cs1_runner.set_parameters(cs1_parameters);
+            cs1_runner.set_data(&data);
+
+            report_map naive_report = cs1_runner.naive(confidence);
+            reports.push_back(naive_report);
+            print_report(&naive_report);
+        }
+    }
+
+    std::ofstream cs1_naive;
+    cs1_naive.open(reports_root_dir + "\\cs1_naive_grid1.txt");
+    save_report_vector_json(&reports, cs1_naive);
+
+    cs1_naive.close();
+    free(data);
+    delete(cs1_parameters);
+}
+
+void cs1_naive_grid2()
+{
+    const int image_num = 9000;
+    const int labels_count = 600;
+
+    bool* data = get_cs1(labels_count, image_num, data_root);
+
+    const double confidence = 0.9;
+
+    Runners::CS1RunnerParameters* cs1_parameters = get_cs1_parameters();
+
+    const uint min_mask_length = 19;
+    const uint max_mask_length = 19;
+    const uint mask_length_step = 1;
+
+    std::vector<report_map> reports;
+    for (uint mask_length = min_mask_length; mask_length <= max_mask_length; mask_length += mask_length_step)
+    {
+        Runners::CS1Runner cs1_runner{};
+
+        cs1_parameters->mask_length = mask_length;
+
+        cs1_runner.set_parameters(cs1_parameters);
+        cs1_runner.set_data(&data);
+
+        report_map naive_report = cs1_runner.naive(confidence);
+        reports.push_back(naive_report);
+        print_report(&naive_report);
+    }
+
+    std::ofstream cs1_naive;
+    cs1_naive.open(reports_root_dir + "\\cs1_naive_grid2.txt");
+    save_report_vector_json(&reports, cs1_naive);
+
+    cs1_naive.close();
+    free(data);
+    delete(cs1_parameters);
+}
+
 int main(int argc, char** argv)
 {
     if (argc == 0)
@@ -299,8 +411,8 @@ int main(int argc, char** argv)
     data_root = argv[2];
     std::string experiment_num = argv[3];
     int experiment_num_int = std::stoi(experiment_num);
-    if (experiment_num_int < 1 || experiment_num_int > 2)
-        throw std::invalid_argument("Only {1,2} experiments are available now");
+    if (experiment_num_int < 1 || experiment_num_int > 3)
+        throw std::invalid_argument("Only {1,2,3} experiments are available now");
 
     typedef std::pair < std::string, std::function<void(void)>> test_type;
     std::vector<test_type> tests;
@@ -319,6 +431,11 @@ int main(int argc, char** argv)
         tests.emplace_back( "Plain test with labels (stat)", labels_stat_naive );
         tests.emplace_back( "Plain test with labels (bio)", labels_bio_naive );
     }
+    if (experiment_num_int == 3)
+    {
+        //tests.emplace_back( "Plain test with matrix transformation (1)", cs1_naive_grid1 );
+        tests.emplace_back( "Plain test with matrix transformation (2)", cs1_naive_grid2 );
+    }
 
 
     std::cout.precision(6);
@@ -326,16 +443,18 @@ int main(int argc, char** argv)
     for (const test_type& pair : tests)
     {
         std::cout << pair.first << std::endl << std::endl;
-        try
-        {
-            pair.second();
-        }
-        catch (std::exception& e)
-        {
-            std::cout << "exception in test: " << e.what() << std::endl;
-
-            system("pause");
-        }
+        pair.second();
+//        try
+//        {
+//            pair.second();
+//        }
+//        catch (std::exception& e)
+//        {
+//            std::cout << "exception in test: " << e.what() << std::endl;
+//            throw e;
+//
+//            system("pause");
+//        }
         std::cout << std::endl;
     }
 

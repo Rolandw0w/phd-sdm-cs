@@ -40,12 +40,51 @@ void init_jaeckel(cell_type* cells, index_type* indices, bool* bits, uint K, uin
 	}
 }
 
+
+template<typename cell_type, typename index_type>
+__global__
+void init_jaeckel_weighted(cell_type* cells, index_type* indices, bool* bits, uint K, uint L, uint M, uint N, int thread_count)
+{
+    int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
+    curandState state;
+    curand_init(thread_num, 0, 0, &state);
+
+    for (uint i = thread_num; i < N; i += thread_count)
+    {
+        for (uint j = 0; j < K; j++)
+        {
+            index_type quartet = (index_type)(L * curand_uniform(&state)/4);
+            index_type el_rand = (index_type) 10*curand_uniform(&state);
+            index_type el = 0;
+            if (el_rand == 6 || el_rand == 7 || el_rand == 8 || el_rand == 9)
+                el = 0;
+            if (el_rand == 3 || el_rand == 4 || el_rand == 5)
+                el = 1;
+            if (el_rand == 1 || el_rand  == 2)
+                el = 2;
+            if (el_rand == 0)
+                el = 3;
+
+            index_type index = 4*quartet + el;
+            indices[i*K + j] = index;
+            long rand = L * curand_uniform(&state);
+            bool bit = rand % 2;
+            bits[i*K + j] = bit;
+            //printf("%d %d %d %d %d %d %d %d\n", i, j, quartet, el_rand, el, index, rand, bit);
+        }
+
+        for (uint j = 0; j < M + 1; j++)
+        {
+            cells[i*(M + 1) + j] = 0;
+        }
+    }
+}
+
 template<typename cell_type, typename index_type>
 __global__
 void init_labels(cell_type* cells, index_type* indices, bool* bits, uint K, uint L, uint M, uint N, int thread_count)
 {
 	int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
-
 
 	for (uint i = thread_num; i < N; i += thread_count)
 	{
@@ -125,6 +164,7 @@ void read_jaeckel(cell_type* cells, int* activated_indices, uint M, int thread_c
 				sum[j] += cells[activated_index * (M + 1) + j];
 			}
 		}
+		//printf("%d %d\n", thread_num, sum[thread_num]);
 	}
 }
 
@@ -172,17 +212,6 @@ void get_array_to_add(bool* value, cell_type* to_add, uint M, int times, int thr
 	for (uint i = thread_num; i < M; i += thread_count)
 	{
 		to_add[i] = value[i] ? times : -times;
-	}
-}
-
-template<typename Array>
-__global__
-void permute(int* permutations, Array arr, Array permuted_array, uint length, int thread_count)
-{
-	int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
-	for (int i = thread_num; i < length; i += thread_count)
-	{
-		permuted_array[i] = arr[permutations[i]];
 	}
 }
 
@@ -263,5 +292,83 @@ void get_bio_result(bool* decisions, bool* result, int min_ones_count, uint M, i
 		}
 		result[i] = ones_count >= min_ones_count;
 	}
+}
+
+template <typename T>
+__global__
+void generate_small_random_matrix(int rows, int columns, T* matrix)
+{
+    int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
+    if (thread_num >= columns)
+        return;
+
+    curandState state;
+    curand_init(thread_num, 0, 0, &state);
+
+    for (int i = 0; i < rows; i++)
+    {
+        double rand = curand_uniform(&state);
+        matrix[thread_num*rows + i] = rand > 0.5;
+    }
+}
+
+template <typename T>
+__global__
+void mult_matrix(bool* left, bool* right, T* result, int left_rows, int left_columns, int right_columns,
+                 int thread_count)
+{
+    int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
+
+    for (int i = thread_num; i < left_rows*right_columns; i += thread_count)
+    {
+        T tmp_sum = 0;
+        int left_row = i / right_columns;
+        int right_column = i % right_columns;
+        for (int j = 0; j < left_columns; j++)
+        {
+            int left_index = left_row*left_columns+j;
+            int right_index = right_column*left_columns+j;
+            T left_item = left[left_index];
+            T right_item = right[right_index];
+            T to_add = left_item * right_item;
+            tmp_sum += to_add;
+        }
+        result[i] = tmp_sum;
+    }
+}
+
+template <typename T>
+__global__
+void mult_matrix_xor(bool* left, bool* right, bool* result, int left_rows, int left_columns, int right_columns,
+                 int thread_count)
+{
+    int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
+
+    for (int i = thread_num; i < left_rows*right_columns; i += thread_count)
+    {
+        bool tmp_sum = 0;
+        int left_row = i / right_columns;
+        int right_column = i % right_columns;
+        for (int j = 0; j < left_columns; j++)
+        {
+            int left_index = left_row*left_columns+j;
+            int right_index = right_column*left_columns+j;
+            bool left_item = left[left_index];
+            bool right_item = right[right_index];
+            bool to_add = left_item ^ right_item;
+            tmp_sum ^= to_add;
+        }
+        result[i] = tmp_sum;
+    }
+}
+
+template<typename T>
+void check_errors(const std::string& prefix = "")
+{
+    auto last_error = cudaGetLastError();
+    if (last_error != cudaSuccess)
+    {
+        throw std::exception(cudaGetErrorString(last_error));
+    }
 }
 #endif // !kernels_cuh

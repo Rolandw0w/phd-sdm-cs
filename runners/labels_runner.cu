@@ -1,9 +1,12 @@
 #ifndef labels_runner_cu
 #define labels_runner_cu
 
-#include "labels_runner.cuh"
+
 #include <iostream>
 #include <fstream>
+
+#include "labels_runner.cuh"
+
 
 namespace Runners
 {

@@ -11,7 +11,7 @@
 bool* get_bits(char c);
 
 bool** get_cifar10_images(int image_num, std::string& data_root);
-
+bool* get_cs1(int labels_count, int image_num, std::string& data_root);
 bool** get_labels(int labels_count, int image_num, std::string& data_root);
 
 #endif // !data_reader_h

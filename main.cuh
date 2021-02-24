@@ -13,10 +13,12 @@
 #include "sdm/sdm_labels.cuh"
 
 #include "runners/cifar10_runner.cuh"
+#include "runners/cs1_runner.cuh"
 #include "runners/labels_runner.cuh"
 
 Runners::CIFAR10RunnerParameters* get_cifar10_parameters();
-Runners::LabelsRunnerParameters* get_labels_parameters();
+Runners::CS1RunnerParameters* get_cs1_parameters();
+Runners::LabelsRunnerParameters* get_labels_parameters(ReadingType reading_type, double bio_threshold = 0.0);
 struct TestData
 {
 	uint image_num;

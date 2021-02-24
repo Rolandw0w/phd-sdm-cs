@@ -24,7 +24,10 @@ add_executable(
         sdm/sdm_labels.cuh
         utils/utils.cpp
         utils/utils.hpp
-)
+        runners/cs1_runner.cuh
+        runners/cs1_runner.cu
+        cuda/functions.cuh)
+
 set_source_files_properties(data_ops/data_reader.cpp PROPERTIES LANGUAGE CUDA)
 set_source_files_properties(data_ops/data_writer.cpp PROPERTIES LANGUAGE CUDA)
 set_source_files_properties(data_ops/image_writer.cpp PROPERTIES LANGUAGE CUDA)
@@ -33,5 +36,5 @@ set_source_files_properties(utils/utils.cpp PROPERTIES LANGUAGE CUDA)
 set_target_properties(
         sdm_cs
         PROPERTIES
-        CUDA_SEPARABLE_COMPILATION ON)
-
+        CUDA_SEPARABLE_COMPILATION ON
+)
