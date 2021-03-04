@@ -2,7 +2,7 @@
 #define cs1_runner_cuh
 
 #include "base_runner.cuh"
-#include "../sdm/sdm_jaeckel.cuh"
+#include "../sdm/sdm_cs1.cuh"
 #include "../utils/utils.hpp"
 
 namespace Runners

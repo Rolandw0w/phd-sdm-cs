@@ -32,9 +32,9 @@ Runners::CS1RunnerParameters* get_cs1_parameters()
     const uint image_count = 9000;
     const uint block_count = 64;
     const uint threads_per_block = 512;
-    const uint bits_per_num = 4;
+    const uint bits_per_num = 1;
     const uint mask_length = 18;
-    const uint labels_count = 600;
+    const uint labels_count = 150;
     const uint target_count = 150;
     const uint address_length = bits_per_num*target_count;
     const uint value_length = bits_per_num*target_count;
@@ -328,7 +328,7 @@ void cs1_naive_grid1()
 
     Runners::CS1RunnerParameters* cs1_parameters = get_cs1_parameters();
 
-    const uint min_mask_length = 2;
+    const uint min_mask_length = 8;
     const uint max_mask_length = 32;
     const uint mask_length_step = 1;
 
@@ -373,23 +373,30 @@ void cs1_naive_grid2()
 
     Runners::CS1RunnerParameters* cs1_parameters = get_cs1_parameters();
 
-    const uint min_mask_length = 19;
-    const uint max_mask_length = 19;
+    const uint min_mask_length = 10;
+    const uint max_mask_length = 10;
     const uint mask_length_step = 1;
 
+    uint cells_counts[] = {//50*1000, 100*1000, 250*1000, 500*1000, 750*1000, 1000*1000, 1250*1000, 1500*1000,
+                           2*1000*1000};
+
     std::vector<report_map> reports;
-    for (uint mask_length = min_mask_length; mask_length <= max_mask_length; mask_length += mask_length_step)
+    for (auto cells_count: cells_counts)
     {
-        Runners::CS1Runner cs1_runner{};
+        for (uint mask_length = min_mask_length; mask_length <= max_mask_length; mask_length += mask_length_step)
+        {
+            Runners::CS1Runner cs1_runner{};
 
-        cs1_parameters->mask_length = mask_length;
+            cs1_parameters->mask_length = mask_length;
+            cs1_parameters->cells_count = cells_count;
 
-        cs1_runner.set_parameters(cs1_parameters);
-        cs1_runner.set_data(&data);
+            cs1_runner.set_parameters(cs1_parameters);
+            cs1_runner.set_data(&data);
 
-        report_map naive_report = cs1_runner.naive(confidence);
-        reports.push_back(naive_report);
-        print_report(&naive_report);
+            report_map naive_report = cs1_runner.naive(confidence);
+            reports.push_back(naive_report);
+            print_report(&naive_report);
+        }
     }
 
     std::ofstream cs1_naive;

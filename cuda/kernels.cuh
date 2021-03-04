@@ -29,8 +29,9 @@ void init_jaeckel(cell_type* cells, index_type* indices, bool* bits, uint K, uin
 		for (uint j = 0; j < K; j++)
 		{
 			indices[i*K + j] = (index_type)(L * curand_uniform(&state));
-			long rand = L * curand_uniform(&state);
-			bits[i*K + j] = rand % 2;
+			double rand = curand_uniform(&state);
+			bits[i*K + j] = rand > 0.5;
+			//printf("%d %d %d\n", i*K + j, indices[i*K + j], bits[i*K + j]);
 		}
 
 		for (uint j = 0; j < M + 1; j++)
@@ -38,6 +39,31 @@ void init_jaeckel(cell_type* cells, index_type* indices, bool* bits, uint K, uin
 			cells[i*(M + 1) + j] = 0;
 		}
 	}
+}
+
+
+template<typename cell_type, typename index_type>
+__global__
+void init_cs1(cell_type* cells, index_type* indices, uint K, uint L, uint M, uint N, int thread_count)
+{
+    int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
+    curandState state;
+    curand_init(thread_num, 0, 0, &state);
+
+    for (uint i = thread_num; i < N; i += thread_count)
+    {
+        for (uint j = 0; j < K; j++)
+        {
+            index_type rand = L * curand_uniform(&state);
+            index_type ind = 2*rand - (L - 1);
+            indices[i*K + j] = ind;
+        }
+
+        for (uint j = 0; j < M + 1; j++)
+        {
+            cells[i*(M + 1) + j] = 0;
+        }
+    }
 }
 
 
@@ -130,6 +156,43 @@ bool is_activated(index_type* indices, bool* bits, int i, uint K, bool* destinat
 	return true;
 }
 
+template<typename index_type, typename value_type>
+__device__
+bool is_activated_cs1(index_type* indices, int i, uint K, value_type* destination_address)
+{
+    for (int j = 0; j < K; j++)
+    {
+        int index = indices[i*K + j];
+        bool bit = index > 0;
+
+        value_type el = destination_address[index];
+        bool flag = (bit && (el >= 0)) ||  (!bit && (el <= 0));
+        if (!flag)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+
+template<typename cell_type, typename index_type, typename summation_type, typename value_type>
+__global__
+void get_activated_cells_cs1(index_type* indices, bool* bits, uint K, uint M, uint N,
+                             int thread_count, value_type* destination_address, int* activated_indices, int* counter)
+{
+    int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
+    for (int i = thread_num; i < N; i += thread_count)
+    {
+        bool activated = is_activated_cs1(indices, bits, i, K, destination_address);
+        if (activated)
+        {
+            int old = atomicAdd(&counter[0], 1);
+            activated_indices[old] = i;
+        }
+    }
+}
+
 
 template<typename cell_type, typename index_type, typename summation_type>
 __global__
@@ -168,6 +231,64 @@ void read_jaeckel(cell_type* cells, int* activated_indices, uint M, int thread_c
 	}
 }
 
+template <typename cell_type, typename sum_type>
+__global__
+void get_acts_sum(cell_type* cells, int* activated_indices, uint M, int* activation_counter, sum_type* sum_act)
+{
+    int activated_cells_number = activation_counter[0];
+    int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (thread_num < activated_cells_number)
+    {
+        int activated_index = activated_indices[thread_num];
+        cell_type m = cells[activated_index * (M + 1) + M];
+        atomicAdd(&sum_act[0], m);
+    }
+}
+
+template<typename cell_type, typename index_type, typename summation_type>
+__global__
+void read_cs1(cell_type* cells, int* activated_indices, uint M, int thread_count, double* sum, int* activation_counter, int* sum_act)
+{
+    int activated_cells_number = activation_counter[0];
+    int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (thread_num < M)
+    {
+        for (int i = 0; i < activated_cells_number; i++)
+        {
+            int activated_index = activated_indices[i];
+            for (int j = thread_num; j < M; j += thread_count)
+            {
+                sum[j] += (((double) cells[activated_index * (M + 1) + j]) / sum_act[0]);
+            }
+        }
+        //printf("%d %d\n", thread_num, sum[thread_num]);
+    }
+}
+
+template<typename cell_type, typename index_type, typename summation_type>
+__global__
+void read_cs1_2(cell_type* cells, int* activated_indices, uint M, int thread_count, double* sum, int activated_cells_number)
+{
+    int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (thread_num < M)
+    {
+
+        for (int i = 0; i < activated_cells_number; i++)
+        {
+            int activated_index = activated_indices[i];
+            cell_type m = cells[activated_index * (M + 1) + M];
+            for (int j = thread_num; j < M; j += thread_count)
+            {
+                sum[j] += (((double) cells[activated_index * (M + 1) + j]) / m);
+            }
+        }
+        //printf("%d %d\n", thread_num, sum[thread_num]);
+    }
+}
+
 template<typename summation_type>
 __global__
 void get_result(summation_type* sum, bool* result, uint M, int thread_count, double threshold = 0.0)
@@ -198,6 +319,38 @@ void write_jaeckel(cell_type* cells, uint M, int thread_count, cell_type* to_add
 			}
 		}
 	}
+}
+
+template<typename cell_type, typename index_type, typename value_type>
+__global__
+void write_cs1(cell_type* cells, uint M, int thread_count, value_type* to_add, int* activated_indices, int activated_cells_number)
+{
+    int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
+//    if (thread_num < 1)
+//    {
+//        for (int i = 0; i < activated_cells_number; i++) {
+//            int cell_index = activated_indices[i];
+//            printf("%d ", cell_index);
+//        }
+//        printf("\n");
+//    }
+
+//    if (thread_num == 0)
+//        printf("\n\nwrite activated_cells_number=%d\n\n", activated_cells_number);
+    if (thread_num < M + 1)
+    {
+        for (int i = 0; i < activated_cells_number; i++)
+        {
+            int cell_index = activated_indices[i];
+            for (int j = thread_num; j < M; j += thread_count)
+            {
+                long ind = cell_index * (M + 1) + j;
+                cells[ind] = cells[ind] + to_add[j];
+            }
+            if (thread_num == 0)
+                cells[cell_index * (M + 1) + M] += 1;
+        }
+    }
 }
 
 template<typename cell_type>
@@ -328,7 +481,7 @@ void mult_matrix(bool* left, bool* right, T* result, int left_rows, int left_col
         {
             int left_index = left_row*left_columns+j;
             int right_index = right_column*left_columns+j;
-            T left_item = left[left_index];
+            T left_item = 2*left[left_index] - 1;
             T right_item = right[right_index];
             T to_add = left_item * right_item;
             tmp_sum += to_add;

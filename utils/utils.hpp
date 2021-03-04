@@ -22,6 +22,9 @@ bool* to_bits(int num, uint dim);
 bool* noise(const bool* value, uint length, double probability);
 bool* noise(const bool* value, uint length, uint error_num);
 
+short* noise(const short* value, uint length, uint error_num);
+short* noise(const short* value, uint length, uint error_num, int seed);
+
 
 template<typename T>
 void sort(T* arr, int size)

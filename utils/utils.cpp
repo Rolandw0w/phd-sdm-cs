@@ -88,4 +88,34 @@ bool* noise(const bool* value, const uint length, const uint error_num)
 	return noised_value;
 }
 
+short* noise(const short* value, const uint length, const uint error_num)
+{
+    std::random_device rd;
+    int seed = rd();
+    return noise(value, length, error_num, seed);
+}
+
+short* noise(const short* value, const uint length, const uint error_num, int seed)
+{
+    std::random_device rd;
+    std::mt19937 generator(seed);
+    std::bernoulli_distribution b_distribution(0.5);
+    std::uniform_int_distribution<int> u_distribution(0, length);
+
+    short* noised_value = (short*)malloc(length * sizeof(short));
+    memcpy(noised_value, value, length * sizeof(short));
+
+    for (uint i = 0; i < error_num; i++)
+    {
+        bool rand = b_distribution(generator);
+        if (rand)
+        {
+            int index = u_distribution(generator);
+            bool rand2 = b_distribution(generator);
+            noised_value[index] = (2*rand2 - 1) + noised_value[index];
+        }
+    }
+    return noised_value;
+}
+
 #endif // !utils_cpp

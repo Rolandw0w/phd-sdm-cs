@@ -76,14 +76,21 @@ bool** get_labels(int labels_count, int image_num, std::string& data_root)
 	FILE* fp = fopen(path, "rb");
 	fread(buffer, 1, image_num * label_size_bytes, fp);
 
+    long a = 0;
+    int m = 0;
 	for (int i = 0; i < image_num; i++)
 	{
+        int c = 0;
 		labels[i] = (bool*)malloc(label_size_bytes * 8 * sizeof(bool));
 		for (int j = 0; j < label_size_bytes; j++)
 		{
 			bool* bits = get_bits(buffer[i * label_size_bytes + j]);
 			for (int k = 0; k < 8; k++)
 			{
+			    c += bits[k];
+                if (m < c)
+                    m = c;
+                a += bits[k];
 				labels[i][j * 8 + k] = bits[k];
 			}
 		}

@@ -3,6 +3,7 @@
 
 
 #include "cs1_runner.cuh"
+#include <fstream>
 
 
 report_map Runners::CS1Runner::naive(const double confidence, const bool save_images, const std::string &data_path)
@@ -21,7 +22,7 @@ report_map Runners::CS1Runner::naive(const double confidence, const bool save_im
     report.insert({"bits_per_num", parameters->bits_per_num});
 
     int rows = parameters->target_count;
-    int columns = parameters->labels_count;
+    int columns = 4*parameters->labels_count;
     bool* transformation = (bool*) malloc(rows*columns*sizeof(bool));
     bool* cuda_transformation;
     cudaMalloc((void**)&cuda_transformation, rows*columns*sizeof(bool));
@@ -66,113 +67,154 @@ report_map Runners::CS1Runner::naive(const double confidence, const bool save_im
     std::cout << std::endl;
     auto max = transformed[0];
     auto max_i = 0;
+    auto min = transformed[0];
+    auto min_i = 0;
     for (int i = 1; i < m; i++)
     {
         auto el = transformed[i];
+        if (min > el)
+        {
+            min_i = i;
+            min = el;
+        }
         if (max < el)
         {
             max_i = i;
             max = el;
         }
     }
-    std::cout << "max=" << max << " max_i=" << max_i << std::endl << std::endl;
+    std::cout <<std::endl;
+    std::cout << "max=" << max << " max_i=" << max_i << std::endl;
+    std::cout << "min=" << min << " min_i=" << min_i << std::endl << std::endl;
 
-    std::vector<std::vector<int>> images(parameters->image_count);
+    std::vector<short*> images(parameters->image_count);
     std::vector<bool*> images_bits(parameters->image_count);
-    for(int i = 0; i < parameters->image_count; i++)
+    long pos = 0;
+    long neg = 0;
+    long z = 0;
+    for(int i = 0; i < 9000; i++)
     {
-        std::vector<int> image(rows);
+        auto image = (short*) malloc((rows * sizeof(short)));
         for(int j = 0; j < rows; j++)
         {
-            auto el = transformed[i+j*9000];
+            auto el = transformed[j*9000+i];
             image[j] = el;
+            if (el > 0)
+                pos++;
+            if (el < 0)
+                neg++;
+            if (el == 0)
+                z++;
         }
         images[i] = image;
     }
 
-    uint dim = parameters->bits_per_num;
-    for(int i = 0; i < parameters->image_count; i++)
-    {
-        auto image = images[i];
-        bool* image_bits = (bool*) malloc(rows*dim*sizeof(bool));
-        for(int j = 0; j < rows; j++)
-        {
-            auto el = image[j];
-            //std::cout << el << ",,,|";
-            bool* bits = to_bits(el, dim);
-            for(int k = 0; k < dim; k++)
-            {
-                image_bits[j*dim + k] = bits[k];
-            }
-            free(bits);
-        }
-        images_bits[i] = image_bits;
-    }
-
-//    for(int i = 100; i < 101; i++)
-//    {
-//        auto ib = images_bits[i];
-//        std::cout << std::endl;
-//        for (int j = 0; j < rows; j++)
-//        {
-//            for (int k = 0; k < dim; k++)
-//            {
-//                std::cout << ib[j*dim + k];
-//            }
-//            std::cout << "|";
-//        }
-//        std::cout << std::endl;
-//    }
-
-    SDM_JAECKEL<short, short, short> sdm(parameters->mask_length, parameters->address_length,
-                                         parameters->value_length, parameters->cells_count, parameters->block_count,
-                                         parameters->threads_per_block);
+    SDM_CS1<long, short, short, short> sdm(parameters->mask_length, parameters->address_length,
+                                            parameters->value_length, parameters->cells_count, parameters->block_count,
+                                            parameters->threads_per_block);
 
     long write_time_start = clock();
-    std::cout << "Started writing" << std::endl;
-    for(int i = 0; i < parameters->image_count; i++)
+    std::cout << "Started writing ";
+    int act_zero = 0;
+    std::vector<int> acts(9000);
+    for(int i = 0; i < 9000; i++)
     {
-        auto el = images_bits[i];
-        sdm.write(el);
+        short* image = images[i];
+        //auto* image_noisy = noise(image, 150, 10, i);
+        int act = sdm.write(image);
+        act_zero += (act == 0);
+        acts[i] = act;
+        if ((i+1) % 1000 == 0)
+            std::cout << (i+1) << " ";
+        //free(image_noisy);
+//        for (int j = 0; j < 150; j++)
+//            std::cout << image[j] << ",";
     }
+    std::cout << std::endl ;
+    //sdm.print_state();
     long write_time = clock() - write_time_start;
 
-    double sum_dist = 0;
     double sum_l1 = 0;
+    double sum_l1_2 = 0;
     long read_time_start = clock();
     //sdm.print_state();
     std::cout << "Started reading" << std::endl;
     double sum_l1_arr = 0;
-    for(int i = 0; i < parameters->image_count; i++)
+
+    double max_l1 = 0;
+    double max_l1_ind = -1;
+
+    double min_l1 = 1e12;
+    double min_l1_ind = -1;
+
+    double avg_l1_r = 0;
+    double avg_l1_f = 0;
+    double avg_l1_c = 0;
+    int read_zeros = 0;
+    std::ofstream restored;
+    restored.open("C:\\Development\\PhD\\Analysis\\data\\restored.txt");
+    for(int i = 0; i < 9000; i++)
     {
-        auto el = images_bits[i];
+        auto el = images[i];
 //        for(int j = 0; j < parameters->value_length; j++)
 //        {
 //            std::cout << el[j] << "|";
 //        }
 //        std::cout << std::endl;
         double l1_arr = 0;
-        bool* remembered = sdm.read(el);
-        int dist = hamming_distance(el, remembered, parameters->value_length);
-        sum_dist += dist;
-        for(int j = 0; j < parameters->value_length / dim; j++)
+        double* remembered = sdm.read(el);
+        //double* remembered2 = sdm.read2(el);
+        double l1 = 0;
+        double l1_r = 0;
+        double l1_f = 0;
+        double l1_c = 0;
+        std::vector<double> rem_arr(parameters->value_length);
+        //std::vector<double> rem2_arr(parameters->value_length);
+        std::vector<short> img_arr(parameters->value_length);
+        bool is_zeros = true;
+        for (int j = 0; j < parameters->value_length; j++)
         {
-            int remembered_int = 0;
-            int el_int = 0;
-            for(int k = 0; k < dim; k++)
-            {
-                bool rem = remembered[j*dim + k];
-                bool el_b = el[j*dim + k];
-                //std::cout << rem << "|" << el_b << ",";
-                remembered_int += rem ? pow(2, dim - k - 1) : 0;
-                el_int += el_b ? pow(2, dim - k - 1) : 0;
-            }
-            //std::cout << remembered_int << ":" << el_int << ";";
-            int l1 = abs(remembered_int - el_int);
-            l1_arr += l1;
-            sum_l1 += l1;
+            double rem = remembered[j];
+            restored << rem << ",";
+            if (abs(rem) > 1e-6)
+                is_zeros = false;
+            //double rem2 = remembered2[j];
+            rem_arr[j] = rem;
+            //rem2_arr[j] = rem2;
+            auto elj = el[j];
+            img_arr[j] = elj;
+            double elj_r = round(rem);
+            double elj_f = floor(rem);
+            double elj_c = ceil(rem);
+            l1_r += abs(elj_r - elj);
+            l1_f += abs(elj_f - elj);
+            l1_c += abs(elj_c - elj);
+            l1 += abs(rem - elj);
+            //l1_2 += abs(rem2 - elj);
         }
+        restored << std::endl;
+        if (is_zeros)
+        {
+            read_zeros += 1;
+            continue;
+        }
+        if (max_l1 < l1)
+        {
+            max_l1 = l1;
+            max_l1_ind = i;
+        }
+        if (min_l1 > l1)
+        {
+            min_l1 = l1;
+            min_l1_ind = i;
+        }
+
+        sum_l1 += l1;
+        l1_arr += l1;
         sum_l1_arr += l1_arr;
+        avg_l1_r += l1_r / parameters->image_count;
+        avg_l1_f += l1_f / parameters->image_count;
+        avg_l1_c += l1_c / parameters->image_count;
         //std::cout << dist << "|";
 //        for(int j = 0; j < parameters->value_length; j++)
 //        {
@@ -183,15 +225,26 @@ report_map Runners::CS1Runner::naive(const double confidence, const bool save_im
         free(remembered);
     }
     long read_time = clock() - read_time_start;
+    //restored.close();
 
-    report.insert({"avg_dist", sum_dist / parameters->image_count});
+    report.insert({"act_zero", act_zero});
     report.insert({"avg_l1", sum_l1 / parameters->image_count});
+    report.insert({"avg_l1_r", avg_l1_r});
+    report.insert({"avg_l1_f", avg_l1_f});
+    report.insert({"avg_l1_c", avg_l1_c});
+    report.insert({"max_l1", max_l1});
+    report.insert({"max_l1_ind", max_l1_ind});
+    report.insert({"min_l1", min_l1});
+    report.insert({"min_l1_ind", min_l1_ind});
     report.insert({"mae", sum_l1_arr / parameters->image_count / rows});
     report.insert({"avg_read_time", (double)read_time / parameters->image_count});
     report.insert({"avg_write_time", (double)write_time / parameters->image_count});
-    report.insert({"min_activations", sdm.get_min_activations()});
-    report.insert({"max_activations", sdm.get_max_activations()});
-    report.insert({"activated_cells_count", sdm.get_activations_num()});
+    report.insert({"read_zeros", read_zeros});
+//    report.insert({"min_activations", sdm.get_min_activations()});
+//    report.insert({"max_activations", sdm.get_max_activations()});
+//    report.insert({"activated_cells_count", sdm.get_activations_num()});
+
+    //sdm.~SDM_CS1();
 
     return report;
 }

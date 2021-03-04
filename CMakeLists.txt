@@ -26,7 +26,7 @@ add_executable(
         utils/utils.hpp
         runners/cs1_runner.cuh
         runners/cs1_runner.cu
-        cuda/functions.cuh)
+        cuda/functions.cuh sdm/sdm_cs1.cuh)
 
 set_source_files_properties(data_ops/data_reader.cpp PROPERTIES LANGUAGE CUDA)
 set_source_files_properties(data_ops/data_writer.cpp PROPERTIES LANGUAGE CUDA)
