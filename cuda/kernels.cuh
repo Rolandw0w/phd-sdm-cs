@@ -158,15 +158,15 @@ bool is_activated(index_type* indices, bool* bits, int i, uint K, bool* destinat
 
 template<typename index_type, typename value_type>
 __device__
-bool is_activated_cs1(index_type* indices, int i, uint K, value_type* destination_address)
+bool is_activated_cs1(index_type* indices, bool* bits, int i, uint K, value_type* destination_address)
 {
     for (int j = 0; j < K; j++)
     {
         int index = indices[i*K + j];
-        bool bit = index > 0;
+        bool bit = bits[index];
 
         value_type el = destination_address[index];
-        bool flag = (bit && (el >= 0)) ||  (!bit && (el <= 0));
+        bool flag = (bit && (el > 0)) ||  (!bit && (el < 0));
         if (!flag)
         {
             return false;

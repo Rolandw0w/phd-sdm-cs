@@ -30,16 +30,17 @@ Runners::CIFAR10RunnerParameters* get_cifar10_parameters()
 Runners::CS1RunnerParameters* get_cs1_parameters()
 {
     const uint image_count = 9000;
+    const uint image_read = 9000;
     const uint block_count = 64;
     const uint threads_per_block = 512;
     const uint bits_per_num = 1;
-    const uint mask_length = 18;
+    const uint mask_length = 10;
     const uint labels_count = 150;
     const uint target_count = 150;
     const uint address_length = bits_per_num*target_count;
     const uint value_length = bits_per_num*target_count;
-    const uint cells_count = 3*1000*1000;
-    auto* cs1_parameters = new Runners::CS1RunnerParameters(image_count, block_count, threads_per_block,
+    const uint cells_count = 12*1000*1000;
+    auto* cs1_parameters = new Runners::CS1RunnerParameters(image_count, image_read, block_count, threads_per_block,
                                                             mask_length, cells_count, address_length, value_length,
                                                             labels_count, target_count, bits_per_num);
 
@@ -272,6 +273,40 @@ void labels_stat_naive()
     delete(labels_parameters);
 }
 
+void labels_knots()
+{
+    const int image_num = 9000;
+    const int labels_count = 651;
+
+    bool** data = get_labels(labels_count, image_num, data_root);
+
+    const double confidence = 0.9;
+
+    uint image_counts[] = {500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000};
+    Runners::LabelsRunnerParameters* labels_parameters = get_labels_parameters(ReadingType::STATISTICAL);
+
+    std::vector<report_map> reports;
+    for (uint image_count: image_counts)
+    {
+        Runners::LabelsRunner labels_runner{};
+        labels_parameters->image_count = image_count;
+
+        labels_runner.set_parameters(labels_parameters);
+        labels_runner.set_data(&data);
+
+        report_map naive_report = labels_runner.naive(confidence);
+        reports.push_back(naive_report);
+        print_report(&naive_report);
+    }
+    std::ofstream labels_stat_naive;
+    labels_stat_naive.open(reports_root_dir + "\\labels_knots.txt");
+    save_report_vector_json(&reports, labels_stat_naive);
+
+    labels_stat_naive.close();
+    free(data);
+    delete(labels_parameters);
+}
+
 void labels_bio_naive()
 {
     const int image_num = 9000;
@@ -373,17 +408,17 @@ void cs1_naive_grid2()
 
     Runners::CS1RunnerParameters* cs1_parameters = get_cs1_parameters();
 
-    const uint min_mask_length = 10;
+    const uint min_mask_length = 1;
     const uint max_mask_length = 10;
     const uint mask_length_step = 1;
 
     uint cells_counts[] = {//50*1000, 100*1000, 250*1000, 500*1000, 750*1000, 1000*1000, 1250*1000, 1500*1000,
-                           2*1000*1000};
+                           12*1000*1000};
 
     std::vector<report_map> reports;
     for (auto cells_count: cells_counts)
     {
-        for (uint mask_length = min_mask_length; mask_length <= max_mask_length; mask_length += mask_length_step)
+        for (uint mask_length = max_mask_length; mask_length >= min_mask_length; mask_length -= mask_length_step)
         {
             Runners::CS1Runner cs1_runner{};
 
@@ -397,6 +432,48 @@ void cs1_naive_grid2()
             reports.push_back(naive_report);
             print_report(&naive_report);
         }
+    }
+
+    std::ofstream cs1_naive;
+    cs1_naive.open(reports_root_dir + "\\cs1_naive_grid2.txt");
+    save_report_vector_json(&reports, cs1_naive);
+
+    cs1_naive.close();
+    free(data);
+    delete(cs1_parameters);
+}
+
+void cs1_knots()
+{
+    const int image_num = 9000;
+    const int labels_count = 600;
+
+    bool* data = get_cs1(labels_count, image_num, data_root);
+
+    const double confidence = 0.9;
+
+    Runners::CS1RunnerParameters* cs1_parameters = get_cs1_parameters();
+
+    const uint min_mask_length = 1;
+    const uint max_mask_length = 10;
+    const uint mask_length_step = 1;
+
+    uint cells_counts[] = {12*1000*1000};
+    uint image_counts[] = {500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000};
+
+    std::vector<report_map> reports;
+    for (auto images_read: image_counts)
+    {
+        Runners::CS1Runner cs1_runner{};
+
+        cs1_parameters->images_read = images_read;
+
+        cs1_runner.set_parameters(cs1_parameters);
+        cs1_runner.set_data(&data);
+
+        report_map naive_report = cs1_runner.naive(confidence);
+        reports.push_back(naive_report);
+        print_report(&naive_report);
     }
 
     std::ofstream cs1_naive;
@@ -435,15 +512,16 @@ int main(int argc, char** argv)
     }
     if (experiment_num_int == 2)
     {
-        tests.emplace_back( "Plain test with labels (stat)", labels_stat_naive );
-        tests.emplace_back( "Plain test with labels (bio)", labels_bio_naive );
+//        tests.emplace_back( "Plain test with labels (stat)", labels_stat_naive );
+//        tests.emplace_back( "Plain test with labels (bio)", labels_bio_naive );
+        tests.emplace_back( "Plain test with labels (knots)", labels_knots );
     }
     if (experiment_num_int == 3)
     {
         //tests.emplace_back( "Plain test with matrix transformation (1)", cs1_naive_grid1 );
-        tests.emplace_back( "Plain test with matrix transformation (2)", cs1_naive_grid2 );
+        //tests.emplace_back( "Plain test with matrix transformation (2)", cs1_naive_grid2 );
+        tests.emplace_back( "Plain test with matrix transformation (3)", cs1_knots );
     }
-
 
     std::cout.precision(6);
 

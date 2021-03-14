@@ -11,6 +11,7 @@ namespace Runners
     {
     public:
         uint image_count;
+        uint images_read;
         uint block_count;
         uint threads_per_block;
         uint mask_length;
@@ -21,11 +22,12 @@ namespace Runners
         uint target_count;
         uint bits_per_num;
 
-        CS1RunnerParameters(uint image_count, uint block_count, uint threads_per_block, uint mask_length,
+        CS1RunnerParameters(uint image_count, uint images_read, uint block_count, uint threads_per_block, uint mask_length,
                             uint cells_count, uint address_length, uint value_length, uint labels_count,
                             uint target_count, uint bits_per_num) :
 
                 image_count(image_count),
+                images_read(images_read),
                 block_count(block_count),
                 threads_per_block(threads_per_block),
                 mask_length(mask_length),
