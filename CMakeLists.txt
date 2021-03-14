@@ -4,34 +4,34 @@ project(sdm_cs CUDA)
 set(CMAKE_CUDA_STANDARD 17)
 
 add_executable(
-        sdm_cs main.cu
-        runners/base_runner.cuh
-        runners/cifar10_runner.cu
-        runners/cifar10_runner.cuh
-        data_ops/data_reader.cpp
-        data_ops/data_reader.hpp
-        data_ops/data_writer.cpp
-        data_ops/data_writer.hpp
-        data_ops/image_writer.cpp
-        data_ops/image_writer.hpp
-        cuda/kernels.cuh
-        runners/labels_runner.cu
-        runners/labels_runner.cuh
-        main.cu
-        main.cuh
-        sdm/sdm_base.cuh
-        sdm/sdm_jaeckel.cuh
-        sdm/sdm_labels.cuh
-        utils/utils.cpp
-        utils/utils.hpp
-        runners/cs1_runner.cuh
-        runners/cs1_runner.cu
-        cuda/functions.cuh sdm/sdm_cs1.cuh)
+        sdm_cs core/main.cu
+        core/runners/base_runner.cuh
+        core/runners/cifar10_runner.cu
+        core/runners/cifar10_runner.cuh
+        core/data_ops/data_reader.cpp
+        core/data_ops/data_reader.hpp
+        core/data_ops/data_writer.cpp
+        core/data_ops/data_writer.hpp
+        core/data_ops/image_writer.cpp
+        core/data_ops/image_writer.hpp
+        core/cuda/kernels.cuh
+        core/runners/labels_runner.cu
+        core/runners/labels_runner.cuh
+        core/main.cu
+        core/main.cuh
+        core/sdm/sdm_base.cuh
+        core/sdm/sdm_jaeckel.cuh
+        core/sdm/sdm_labels.cuh
+        core/utils/utils.cpp
+        core/utils/utils.hpp
+        core/runners/cs1_runner.cuh
+        core/runners/cs1_runner.cu
+        core/cuda/functions.cuh core/sdm/sdm_cs1.cuh)
 
-set_source_files_properties(data_ops/data_reader.cpp PROPERTIES LANGUAGE CUDA)
-set_source_files_properties(data_ops/data_writer.cpp PROPERTIES LANGUAGE CUDA)
-set_source_files_properties(data_ops/image_writer.cpp PROPERTIES LANGUAGE CUDA)
-set_source_files_properties(utils/utils.cpp PROPERTIES LANGUAGE CUDA)
+set_source_files_properties(core/data_ops/data_reader.cpp PROPERTIES LANGUAGE CUDA)
+set_source_files_properties(core/data_ops/data_writer.cpp PROPERTIES LANGUAGE CUDA)
+set_source_files_properties(core/data_ops/image_writer.cpp PROPERTIES LANGUAGE CUDA)
+set_source_files_properties(core/utils/utils.cpp PROPERTIES LANGUAGE CUDA)
 
 set_target_properties(
         sdm_cs
