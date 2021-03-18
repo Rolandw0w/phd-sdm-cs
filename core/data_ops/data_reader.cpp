@@ -63,14 +63,14 @@ bool** get_cifar10_images(int image_num, std::string& data_root)
 
 bool** get_labels(int labels_count, int image_num, std::string& data_root)
 {
-	int label_size_bits = labels_count + 8 - (labels_count % 8);
+	int label_size_bits = labels_count - (labels_count % 8);
 	int label_size_bytes = label_size_bits / 8;
 
 	bool** labels = (bool**)malloc(image_num * sizeof(bool*));
 
 	char* buffer = (char*)malloc(label_size_bytes * image_num * sizeof(char));
 
-    std::string full_path = data_root + "\\features.bin";
+    std::string full_path = data_root + "\\cs1.bin";
     const char* path = &full_path[0];
 
 	FILE* fp = fopen(path, "rb");

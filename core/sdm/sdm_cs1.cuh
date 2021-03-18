@@ -57,8 +57,10 @@ SDM_CS1<cell_type, index_type, summation_type, value_type>::SDM_CS1(uint K, uint
     cudaMalloc((void**)&cells, N * (M + 1) * sizeof(cell_type));
     cudaMalloc((void**)&indices, K * N * sizeof(index_type));
     cudaMalloc((void**)&bits, K * N * sizeof(bool));
+    check_errors<int>("init_labels");
 
     init_jaeckel<<<block_count, threads_per_block>>> (cells, indices, bits, K, L, M, N, thread_count);
+    check_errors<int>("init_labels");
 }
 
 template<typename cell_type, typename index_type, typename summation_type, typename value_type>

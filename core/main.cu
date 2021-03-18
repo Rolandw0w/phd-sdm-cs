@@ -31,7 +31,7 @@ Runners::CS1RunnerParameters* get_cs1_parameters()
 {
     const uint image_count = 9000;
     const uint image_read = 9000;
-    const uint block_count = 64;
+    const uint block_count = 32;
     const uint threads_per_block = 512;
     const uint bits_per_num = 1;
     const uint mask_length = 10;
@@ -53,10 +53,10 @@ Runners::LabelsRunnerParameters* get_labels_parameters(ReadingType reading_type,
     const uint block_count = 32;
     const uint threads_per_block = 512;
     const uint mask_length = 2;
-    const uint address_length = 651;
-    const uint value_length = 651;
-    const uint labels_count = 651;
-    const uint cells_count = value_length*(value_length-1)/2;
+    const uint address_length = 600;
+    const uint value_length = 600;
+    const uint labels_count = 600;
+    const uint cells_count = 1*1000*1000;
     auto* labels_parameters = new Runners::LabelsRunnerParameters(image_count, block_count, threads_per_block,
                                                                   mask_length, cells_count, address_length, value_length,
                                                                   labels_count, reading_type, bio_threshold);
@@ -276,13 +276,13 @@ void labels_stat_naive()
 void labels_knots()
 {
     const int image_num = 9000;
-    const int labels_count = 651;
+    const int labels_count = 600;
 
     bool** data = get_labels(labels_count, image_num, data_root);
 
     const double confidence = 0.9;
 
-    uint image_counts[] = {500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000};
+    uint image_counts[] = {1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000};
     Runners::LabelsRunnerParameters* labels_parameters = get_labels_parameters(ReadingType::STATISTICAL);
 
     std::vector<report_map> reports;
