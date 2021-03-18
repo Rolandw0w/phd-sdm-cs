@@ -443,7 +443,7 @@ void cs1_naive_grid2()
     delete(cs1_parameters);
 }
 
-void cs1_knots()
+void cs1_image_count_grid()
 {
     const int image_num = 9000;
     const int labels_count = 600;
@@ -453,12 +453,6 @@ void cs1_knots()
     const double confidence = 0.9;
 
     Runners::CS1RunnerParameters* cs1_parameters = get_cs1_parameters();
-
-    const uint min_mask_length = 1;
-    const uint max_mask_length = 10;
-    const uint mask_length_step = 1;
-
-    uint cells_counts[] = {12*1000*1000};
     uint image_counts[] = {500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000};
 
     std::vector<report_map> reports;
@@ -520,7 +514,7 @@ int main(int argc, char** argv)
     {
         //tests.emplace_back( "Plain test with matrix transformation (1)", cs1_naive_grid1 );
         //tests.emplace_back( "Plain test with matrix transformation (2)", cs1_naive_grid2 );
-        tests.emplace_back( "Plain test with matrix transformation (3)", cs1_knots );
+        tests.emplace_back( "Compressed sensing (image count grid)", cs1_image_count_grid );
     }
 
     std::cout.precision(6);
