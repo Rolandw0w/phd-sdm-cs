@@ -13,7 +13,8 @@
 #include <vector>
 #include <Windows.h>
 
-#include "../utils/utils.hpp"
+#include "functions.cuh"
+//#include "../utils/utils.hpp"
 
 
 template<typename cell_type, typename index_type>
@@ -108,7 +109,7 @@ void init_jaeckel_weighted(cell_type* cells, index_type* indices, bool* bits, ui
 
 template<typename cell_type, typename index_type>
 __global__
-void init_labels(cell_type* cells, index_type* indices, bool* bits, uint K, uint L, uint M, uint N, int thread_count)
+void init_labels(cell_type* cells, index_type* indices, uint K, uint L, uint M, uint N, int thread_count)
 {
 	int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
     curandState state;
@@ -120,27 +121,11 @@ void init_labels(cell_type* cells, index_type* indices, bool* bits, uint K, uint
 		{
 			cells[i * (M + 1) + j] = 0;
 		}
+		for (uint k = 0; k < K; k++)
+        {
+            indices[K*i+k] = (index_type)(L * curand_uniform(&state));
+        }
 	}
-	if (thread_num != 0)
-		return;
-
-	int index = 0;
-//	for (int i = 0; i < M - 1; i++)
-//	{
-//		for (int j = i + 1; j < M; j++)
-//		{
-//			indices[index] = (index_type) i;
-//			indices[index + 1] = (index_type) j;
-//			index += 2;
-//		}
-//	}
-    while (true)
-    {
-        if (index >= N)
-            break;
-        indices[index] = (index_type)(L * curand_uniform(&state));
-        index += 1;
-    }
 }
 
 template<typename index_type>

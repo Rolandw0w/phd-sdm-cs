@@ -11,6 +11,7 @@ namespace Runners
 	{
 	public:
 		uint image_count;
+		uint images_read;
 		uint block_count;
 		uint threads_per_block;
 		uint mask_length;
@@ -21,11 +22,12 @@ namespace Runners
 		ReadingType reading_type;
 		double bio_threshold;
 
-		LabelsRunnerParameters(uint image_count, uint block_count, uint threads_per_block, uint mask_length,
+		LabelsRunnerParameters(uint image_count, uint images_read, uint block_count, uint threads_per_block, uint mask_length,
 			uint cells_count, uint address_length, uint value_length, uint labels_count,
 			ReadingType reading_type, double bio_threshold = 0.0) :
 			
 			image_count(image_count),
+			images_read(images_read),
 			block_count(block_count),
 			threads_per_block(threads_per_block),
 			mask_length(mask_length),
@@ -41,7 +43,7 @@ namespace Runners
 	class LabelsRunner : public BaseRunner
 	{
 	public:
-		report_map naive(const double confidence, const bool save_images = false, const std::string& images_path = "");
+		report_map naive(const std::string& data_path, const std::string& output_path);
 
 		void set_data(bool*** d) { this->data = *d; }
 

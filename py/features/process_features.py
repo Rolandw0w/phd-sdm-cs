@@ -37,7 +37,7 @@ def filter_labels(input_path: str, score_threshold):
     return descriptions_dict, filtered_labels
 
 
-def process(features_path: str, score_threshold: float, non_zero_images: int, output_path: str):
+def process(features_path: str, score_threshold: float, non_zero_images: int, output_path: str, max_features: int = None):
     image_descriptions, labels = filter_labels(features_path, score_threshold)
 
     numbers = sorted([int(x) for x in labels.keys()])
@@ -62,7 +62,8 @@ def process(features_path: str, score_threshold: float, non_zero_images: int, ou
             continue
 
         code += ["0"] * (8 - len(code) % 8)
-        for i in range(0, len(code), 8):
+        max_features = max_features or len(code)
+        for i in range(0, max_features, 8):
             code_byte = "".join(code[i:i+8])
             code_byte_int = int(code_byte, 2)
             bytes_to_write = code_byte_int.to_bytes(1, byteorder="big", signed=False)
@@ -101,6 +102,9 @@ def main():
     default_output_path = os.path.abspath(os.path.join(cwd, "../../data/features.bin"))
     parser.add_argument("--output", help="Path to .bin with features", default=default_output_path)
 
+    default_max_features = 600
+    parser.add_argument("--max_features", help="Maximum number of features to process", default=default_max_features)
+
     arguments = parser.parse_args()
 
     features_path = arguments.input
@@ -125,9 +129,17 @@ def main():
         logger.error(msg)
         exit(1)
 
+    max_features = arguments.max_features
+    try:
+        max_features = int(max_features)
+    except:
+        msg = f"max_features must be integer, got {max_features}"
+        logger.error(msg)
+        exit(1)
+
     output_path = arguments.output
 
-    process(features_path, score_threshold, non_zero_images, output_path)
+    process(features_path, score_threshold, non_zero_images, output_path, max_features=max_features)
 
 
 if __name__ == "__main__":

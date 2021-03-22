@@ -68,4 +68,13 @@ T mean(T* arr, int size)
 {
 	return sum(arr, size) / size;
 }
+
+template <typename T>
+void out(T* array, int length, char sep)
+{
+    for (int i = 0; i < length; i++)
+    {
+        std::cout << array[i] << sep;
+    }
+}
 #endif // !utils_h

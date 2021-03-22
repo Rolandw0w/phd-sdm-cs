@@ -6,9 +6,8 @@ import data_wrangling as dw
 from utils import calculate_l1
 
 
-def restore_signal(true_signal, sdm_signal, transformation, error_handler=None) -> np.ndarray:
+def restore_signal(non_zero_features, sdm_signal, transformation, error_handler=None) -> np.ndarray:
     try:
-        non_zero_features = true_signal.nonzero()
         len_non_zero_features = len(non_zero_features[0])
         if len_non_zero_features == 0:
             raise ValueError("No features in array")

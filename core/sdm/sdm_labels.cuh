@@ -74,9 +74,8 @@ SDM_LABELS<cell_type, index_type, summation_type>::SDM_LABELS(ulong K, ulong L, 
 
 	cudaMalloc((void**)&cells, N * (M + 1) * sizeof(cell_type));
 	cudaMalloc((void**)&indices, K * N * sizeof(index_type));
-	//cudaMalloc((void**)&bits, K * N * sizeof(bool));
 
-	init_labels <<<block_count, threads_per_block>>> (cells, indices, bits, K, L, M, N, thread_count);
+	init_labels <<<block_count, threads_per_block>>> (cells, indices, K, L, M, N, thread_count);
 }
 
 template<typename cell_type, typename index_type, typename summation_type>
@@ -249,8 +248,11 @@ void SDM_LABELS<cell_type, index_type, summation_type>::read_stat(bool* cuda_val
 {
 	auto* thresholds = (double*)malloc(activated_cells_number * sizeof(double));
 	cudaMemcpy(thresholds, cuda_thresholds, activated_cells_number * sizeof(double), cudaMemcpyDeviceToHost);
+//    out(thresholds, activated_cells_number, ',');
+//    std::cout << std::endl;
 
 	double threshold = median(thresholds, activated_cells_number);
+//	printf("med=%f activated_cells_number=%d\n", threshold, activated_cells_number);
 
 	read_jaeckel<cell_type, index_type, summation_type> <<<block_count, threads_per_block>>>
 		(cells, cuda_activation_indices, M, thread_count, cuda_sum, activated_cells_number);
@@ -321,9 +323,13 @@ void SDM_LABELS<cell_type, index_type, summation_type>::write(const bool* value,
 	activation_counter[0] = 0;
 	cudaMemcpy(cuda_activation_counter, activation_counter, sizeof(int), cudaMemcpyHostToDevice);
 
-	get_activated_cells_bool<cell_type, index_type, summation_type> <<<block_count, threads_per_block>>>
-		(indices, true, K, M, N, thread_count, cuda_address, cuda_activation_indices, cuda_activation_counter);
-	cudaDeviceSynchronize();
+	kernel_decorator(get_activated_cells_bool<cell_type, index_type, summation_type>,
+                     block_count, threads_per_block,
+                     indices, true, K, M, N, thread_count, cuda_address, cuda_activation_indices, cuda_activation_counter);
+
+//	get_activated_cells_bool<cell_type, index_type, summation_type> <<<block_count, threads_per_block>>>
+//		(indices, true, K, M, N, thread_count, cuda_address, cuda_activation_indices, cuda_activation_counter);
+//	cudaDeviceSynchronize();
 
 	cudaMemcpy(activation_counter, cuda_activation_counter, sizeof(int), cudaMemcpyDeviceToHost);
 	int activated_cells_number = activation_counter[0];

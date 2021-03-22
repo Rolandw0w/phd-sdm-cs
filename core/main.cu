@@ -8,8 +8,9 @@
 #include "main.cuh"
 
 
-std::string reports_root_dir;
+std::string reports_root;
 std::string data_root;
+std::string output_root;
 
 
 Runners::CIFAR10RunnerParameters* get_cifar10_parameters()
@@ -50,6 +51,7 @@ Runners::CS1RunnerParameters* get_cs1_parameters()
 Runners::LabelsRunnerParameters* get_labels_parameters(ReadingType reading_type, double bio_threshold)
 {
     const uint image_count = 9000;
+    const uint image_read = 9000;
     const uint block_count = 32;
     const uint threads_per_block = 512;
     const uint mask_length = 2;
@@ -57,7 +59,7 @@ Runners::LabelsRunnerParameters* get_labels_parameters(ReadingType reading_type,
     const uint value_length = 600;
     const uint labels_count = 600;
     const uint cells_count = 3*1000*1000;
-    auto* labels_parameters = new Runners::LabelsRunnerParameters(image_count, block_count, threads_per_block,
+    auto* labels_parameters = new Runners::LabelsRunnerParameters(image_count, image_read, block_count, threads_per_block,
                                                                   mask_length, cells_count, address_length, value_length,
                                                                   labels_count, reading_type, bio_threshold);
 
@@ -111,7 +113,7 @@ void cifar10_naive()
         print_report(&naive_report);
     }
     std::ofstream naive;
-    naive.open(reports_root_dir + "\\naive.txt");
+    naive.open(reports_root + "\\naive.txt");
     save_report_vector_json(&reports, naive);
 
     naive.close();
@@ -143,7 +145,7 @@ void cifar10_multiple_write()
         print_report(&multiple_write_report);
     }
     std::ofstream multiple_write;
-    multiple_write.open(reports_root_dir + "\\cifar10_multiple_write.txt");
+    multiple_write.open(reports_root + "\\cifar10_multiple_write.txt");
     save_report_vector_json(&reports, multiple_write);
 
     multiple_write.close();
@@ -173,7 +175,7 @@ void cifar10_iterative_read()
         print_report(&iterative_read_report);
     }
     std::ofstream iterative_read;
-    iterative_read.open(reports_root_dir + "\\iterative_read.txt");
+    iterative_read.open(reports_root + "\\iterative_read.txt");
     save_report_vector_json(&reports, iterative_read);
 
     iterative_read.close();
@@ -202,7 +204,7 @@ void cifar10_noisy_address()
         print_report(&noisy_address_report);
     }
     std::ofstream noisy_address;
-    noisy_address.open(reports_root_dir + "\\noisy_address.txt");
+    noisy_address.open(reports_root + "\\noisy_address.txt");
     save_report_vector_json(&reports, noisy_address);
 
     noisy_address.close();
@@ -231,7 +233,7 @@ void cifar10_noisy_address_noisy_value()
         print_report(&noisy_address_report);
     }
     std::ofstream noisy_address_noisy_value;
-    noisy_address_noisy_value.open(reports_root_dir + "\\noisy_address_noisy_value.txt");
+    noisy_address_noisy_value.open(reports_root + "\\noisy_address_noisy_value.txt");
     save_report_vector_json(&reports, noisy_address_noisy_value);
 
     noisy_address_noisy_value.close();
@@ -245,7 +247,6 @@ void labels_stat_naive()
 
     bool** data = get_labels(labels_count, image_num, data_root);
 
-    const double confidence = 0.9;
     const uint min_mask_length = 2;
     const uint max_mask_length = 2;
     const uint mask_length_step = 1;
@@ -260,12 +261,12 @@ void labels_stat_naive()
         labels_runner.set_parameters(labels_parameters);
         labels_runner.set_data(&data);
 
-        report_map naive_report = labels_runner.naive(confidence);
+        report_map naive_report = labels_runner.naive(data_root, output_root);
         reports.push_back(naive_report);
         print_report(&naive_report);
     }
     std::ofstream labels_stat_naive;
-    labels_stat_naive.open(reports_root_dir + "\\labels_stat_naive.txt");
+    labels_stat_naive.open(reports_root + "\\labels_stat_naive.txt");
     save_report_vector_json(&reports, labels_stat_naive);
 
     labels_stat_naive.close();
@@ -280,26 +281,24 @@ void labels_knots()
 
     bool** data = get_labels(labels_count, image_num, data_root);
 
-    const double confidence = 0.9;
-
-    uint image_counts[] = {500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000};
+    uint images_reads[] = {500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000};
     Runners::LabelsRunnerParameters* labels_parameters = get_labels_parameters(ReadingType::STATISTICAL);
 
     std::vector<report_map> reports;
-    for (uint image_count: image_counts)
+    for (uint images_read: images_reads)
     {
         Runners::LabelsRunner labels_runner{};
-        labels_parameters->image_count = image_count;
+        labels_parameters->images_read = images_read;
 
         labels_runner.set_parameters(labels_parameters);
         labels_runner.set_data(&data);
 
-        report_map naive_report = labels_runner.naive(confidence);
+        report_map naive_report = labels_runner.naive(data_root, output_root);
         reports.push_back(naive_report);
         print_report(&naive_report);
     }
     std::ofstream labels_stat_naive;
-    labels_stat_naive.open(reports_root_dir + "\\labels_knots.txt");
+    labels_stat_naive.open(reports_root + "\\labels_knots.txt");
     save_report_vector_json(&reports, labels_stat_naive);
 
     labels_stat_naive.close();
@@ -314,8 +313,6 @@ void labels_bio_naive()
 
     bool** data = get_labels(labels_count, image_num, data_root);
 
-    const double confidence = 0.9;
-
     const double bio_thresholds[7] = {0.01, 0.1, 0.25, 0.5, 0.75, 0.9, 0.99};
 
     Runners::LabelsRunnerParameters* labels_parameters = get_labels_parameters(ReadingType::BIOLOGICAL);
@@ -329,13 +326,13 @@ void labels_bio_naive()
         labels_runner.set_parameters(labels_parameters);
         labels_runner.set_data(&data);
 
-        report_map naive_report = labels_runner.naive(confidence);
+        report_map naive_report = labels_runner.naive(data_root, output_root);
         reports.push_back(naive_report);
         print_report(&naive_report);
     }
 
     std::ofstream labels_bio_naive;
-    labels_bio_naive.open(reports_root_dir + "\\labels_bio_naive.txt");
+    labels_bio_naive.open(reports_root + "\\labels_bio_naive.txt");
     save_report_vector_json(&reports, labels_bio_naive);
 
     labels_bio_naive.close();
@@ -349,17 +346,6 @@ void cs1_naive_grid1()
     const int labels_count = 600;
 
     bool* data = get_cs1(labels_count, image_num, data_root);
-//    std::cout << std::endl;
-//    for (int i = 0; i < 1; i++)
-//    {
-//        for (int j = 0; j < labels_count; j++)
-//        {
-//            std::cout << data[j];
-//        }
-//    }
-//    std::cout << std::endl;
-
-    const double confidence = 0.9;
 
     Runners::CS1RunnerParameters* cs1_parameters = get_cs1_parameters();
 
@@ -382,14 +368,14 @@ void cs1_naive_grid1()
             cs1_runner.set_parameters(cs1_parameters);
             cs1_runner.set_data(&data);
 
-            report_map naive_report = cs1_runner.naive(confidence);
+            report_map naive_report = cs1_runner.naive(data_root, output_root);
             reports.push_back(naive_report);
             print_report(&naive_report);
         }
     }
 
     std::ofstream cs1_naive;
-    cs1_naive.open(reports_root_dir + "\\cs1_naive_grid1.txt");
+    cs1_naive.open(reports_root + "\\cs1_naive_grid1.txt");
     save_report_vector_json(&reports, cs1_naive);
 
     cs1_naive.close();
@@ -403,8 +389,6 @@ void cs1_naive_grid2()
     const int labels_count = 600;
 
     bool* data = get_cs1(labels_count, image_num, data_root);
-
-    const double confidence = 0.9;
 
     Runners::CS1RunnerParameters* cs1_parameters = get_cs1_parameters();
 
@@ -428,14 +412,14 @@ void cs1_naive_grid2()
             cs1_runner.set_parameters(cs1_parameters);
             cs1_runner.set_data(&data);
 
-            report_map naive_report = cs1_runner.naive(confidence);
+            report_map naive_report = cs1_runner.naive(data_root, output_root);
             reports.push_back(naive_report);
             print_report(&naive_report);
         }
     }
 
     std::ofstream cs1_naive;
-    cs1_naive.open(reports_root_dir + "\\cs1_naive_grid2.txt");
+    cs1_naive.open(reports_root + "\\cs1_naive_grid2.txt");
     save_report_vector_json(&reports, cs1_naive);
 
     cs1_naive.close();
@@ -450,28 +434,31 @@ void cs1_image_count_grid()
 
     bool* data = get_cs1(labels_count, image_num, data_root);
 
-    const double confidence = 0.9;
-
     Runners::CS1RunnerParameters* cs1_parameters = get_cs1_parameters();
+    uint mask_lengths[] = {8, 9, 10, 11, 12, 13, 14, 15, 16};
     uint image_counts[] = {500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000};
 
     std::vector<report_map> reports;
-    for (auto images_read: image_counts)
+    for (auto mask_length: mask_lengths)
     {
-        Runners::CS1Runner cs1_runner{};
+        for (auto images_read: image_counts)
+        {
+            Runners::CS1Runner cs1_runner{};
 
-        cs1_parameters->images_read = images_read;
+            cs1_parameters->images_read = images_read;
+            cs1_parameters->mask_length = mask_length;
 
-        cs1_runner.set_parameters(cs1_parameters);
-        cs1_runner.set_data(&data);
+            cs1_runner.set_parameters(cs1_parameters);
+            cs1_runner.set_data(&data);
 
-        report_map naive_report = cs1_runner.naive(confidence);
-        reports.push_back(naive_report);
-        print_report(&naive_report);
+            report_map naive_report = cs1_runner.naive(data_root, output_root);
+            reports.push_back(naive_report);
+            print_report(&naive_report);
+        }
     }
 
     std::ofstream cs1_naive;
-    cs1_naive.open(reports_root_dir + "\\cs1_naive_grid2.txt");
+    cs1_naive.open(reports_root + "\\cs1_naive_grid2.txt");
     save_report_vector_json(&reports, cs1_naive);
 
     cs1_naive.close();
@@ -485,9 +472,10 @@ int main(int argc, char** argv)
         throw std::invalid_argument("Pass arguments!");
 
     // handle input arguments
-    reports_root_dir = argv[1];
+    reports_root = argv[1];
     data_root = argv[2];
-    std::string experiment_num = argv[3];
+    output_root = argv[3];
+    std::string experiment_num = argv[4];
     int experiment_num_int = std::stoi(experiment_num);
     if (experiment_num_int < 1 || experiment_num_int > 3)
         throw std::invalid_argument("Only {1,2,3} experiments are available now");

@@ -6,7 +6,7 @@
 #include <fstream>
 
 
-report_map Runners::CS1Runner::naive(const double confidence, const bool save_images, const std::string &data_path)
+report_map Runners::CS1Runner::naive(const std::string& data_path, const std::string& output_path)
 {
     report_map report;
 
@@ -35,6 +35,23 @@ report_map Runners::CS1Runner::naive(const double confidence, const bool save_im
     cudaDeviceSynchronize();
     check_errors<int>("cudaMemcpy/transformation");
     uint m = rows*parameters->image_count;
+
+    std::ofstream transformation_file;
+    transformation_file.open(output_path + "\\cs1_matrix_K_" + std::to_string(parameters->mask_length) +
+                  "_I_" + std::to_string(parameters->images_read) + ".csv");
+
+    for (int i = 0; i < rows; i++)
+    {
+        for (int j = 0; j < columns; j++)
+        {
+            auto ind = i*columns + j;
+            auto el = transformation[ind];
+            int to_write = 2*el - 1;
+            auto sep = (j == columns - 1) ? "\n" : ",";
+            transformation_file << to_write << sep;
+        }
+    }
+    transformation_file.close();
 
     typedef int SUM_TYPE;
 
@@ -123,24 +140,17 @@ report_map Runners::CS1Runner::naive(const double confidence, const bool save_im
     for(int i = 0; i < parameters->images_read; i++)
     {
         short* image = images[i];
-        //auto* image_noisy = noise(image, 150, 10, i);
         int act = sdm.write(image);
         act_zero += (act == 0);
         acts[i] = act;
         if ((i+1) % 1000 == 0)
             std::cout << (i+1) << " ";
-        //free(image_noisy);
-//        for (int j = 0; j < 150; j++)
-//            std::cout << image[j] << ",";
     }
     std::cout << std::endl ;
-    //sdm.print_state();
     long write_time = clock() - write_time_start;
 
     double sum_l1 = 0;
-    double sum_l1_2 = 0;
     long read_time_start = clock();
-    //sdm.print_state();
     std::cout << "Started reading" << " ";
     double sum_l1_arr = 0;
 
@@ -155,8 +165,8 @@ report_map Runners::CS1Runner::naive(const double confidence, const bool save_im
     double avg_l1_c = 0;
     int read_zeros = 0;
     std::ofstream restored;
-    restored.open("C:\\Development\\PhD\\Analysis\\data\\restored_K_" + std::to_string(parameters->mask_length) +
-                    "_I_" + std::to_string(parameters->images_read) + ".txt");
+    restored.open(output_path + "\\cs1_K_" + std::to_string(parameters->mask_length) +
+                    "_I_" + std::to_string(parameters->images_read) + ".csv");
     for(int i = 0; i < parameters->images_read; i++)
     {
         auto el = images[i];
@@ -172,12 +182,11 @@ report_map Runners::CS1Runner::naive(const double confidence, const bool save_im
         for (int j = 0; j < parameters->value_length; j++)
         {
             double rem = remembered[j];
-            restored << rem << ",";
+            auto sep = (j == parameters->value_length - 1) ? "\n" : ",";
+            restored << rem << sep;
             if (abs(rem) > 1e-6)
                 is_zeros = false;
-            //double rem2 = remembered2[j];
             rem_arr[j] = rem;
-            //rem2_arr[j] = rem2;
             auto elj = el[j];
             img_arr[j] = elj;
             double elj_r = round(rem);
@@ -187,9 +196,7 @@ report_map Runners::CS1Runner::naive(const double confidence, const bool save_im
             l1_f += abs(elj_f - elj);
             l1_c += abs(elj_c - elj);
             l1 += abs(rem - elj);
-            //l1_2 += abs(rem2 - elj);
         }
-        restored << std::endl;
         if (is_zeros)
         {
             read_zeros += 1;
@@ -212,20 +219,13 @@ report_map Runners::CS1Runner::naive(const double confidence, const bool save_im
         avg_l1_r += l1_r / parameters->images_read;
         avg_l1_f += l1_f / parameters->images_read;
         avg_l1_c += l1_c / parameters->images_read;
-        //std::cout << dist << "|";
-//        for(int j = 0; j < parameters->value_length; j++)
-//        {
-//            std::cout << remembered[j] << "|";
-//        }
-//        std::cout << std::endl;
-//        std::cout << dist << "|";
         free(remembered);
         if ((i+1) % 1000 == 0)
             std::cout << (i+1) << " ";
     }
     std::cout << std::endl;
     long read_time = clock() - read_time_start;
-    //restored.close();
+    restored.close();
 
     report.insert({"act_zero", act_zero});
     report.insert({"avg_l1", sum_l1 / parameters->images_read});
@@ -243,8 +243,6 @@ report_map Runners::CS1Runner::naive(const double confidence, const bool save_im
 //    report.insert({"min_activations", sdm.get_min_activations()});
 //    report.insert({"max_activations", sdm.get_max_activations()});
 //    report.insert({"activated_cells_count", sdm.get_activations_num()});
-
-    //sdm.~SDM_CS1();
 
     return report;
 }

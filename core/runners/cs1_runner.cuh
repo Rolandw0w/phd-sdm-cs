@@ -43,7 +43,7 @@ namespace Runners
     class CS1Runner : public BaseRunner
     {
     public:
-        report_map naive(const double confidence, const bool save_images = false, const std::string& data_path = "");
+        report_map naive(const std::string& data_path, const std::string& output_path);
 
         void set_data(bool** d) { this->data = *d; }
 

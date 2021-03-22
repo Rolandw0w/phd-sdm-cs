@@ -8,7 +8,7 @@
 #include "utils.hpp"
 
 
-uint hamming_distance(bool *x, bool *y, uint dim)
+uint hamming_distance(bool* x, bool* y, uint dim)
 {
 	uint dist = 0;
 	for (uint d = 0; d < dim; d++)

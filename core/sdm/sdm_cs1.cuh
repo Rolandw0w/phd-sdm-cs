@@ -113,23 +113,6 @@ double* SDM_CS1<cell_type, index_type, summation_type, value_type>::read(const v
 
         cudaMemcpy(activation_counter, cuda_activation_counter, sizeof(int), cudaMemcpyDeviceToHost);
         check_errors<int>();
-        int activated_cells_number = activation_counter[0];
-        //std::cout << "activated_cells_number=" << activated_cells_number << " ";
-        //std::cout << "activated_cells_number_read=" << activated_cells_number << std::endl;
-        //std::cout << activated_cells_number << ",";
-//        std::cout << std::endl;
-//        std::cout << std::endl;
-//        std::cout << std::endl;
-//        std::cout << activated_cells_number << ",";
-        //std::cout << activated_cells_number << ",";
-//		if (activated_cells_number != 0)
-//        {
-//		    for(int j = 0; j < M; j++)
-//            {
-//		        std::cout << value[j];
-//            }
-//		    std::cout << std::endl;
-//        }
         int* cuda_sum_act;
         cudaMalloc((void **)&cuda_sum_act, sizeof(int));
         get_acts_sum<cell_type, int><<<block_count, threads_per_block>>>

@@ -70,7 +70,7 @@ bool** get_labels(int labels_count, int image_num, std::string& data_root)
 
 	char* buffer = (char*)malloc(label_size_bytes * image_num * sizeof(char));
 
-    std::string full_path = data_root + "\\cs1.bin";
+    std::string full_path = data_root + "\\features.bin";
     const char* path = &full_path[0];
 
 	FILE* fp = fopen(path, "rb");
@@ -106,7 +106,7 @@ bool* get_cs1(int labels_count, int image_num, std::string& data_root)
 
     char* buffer = (char*)malloc(label_size_bytes * image_num * sizeof(char));
 
-    std::string full_path = data_root + "\\cs1.bin";
+    std::string full_path = data_root + "\\features.bin";
     const char* path = &full_path[0];
 
     FILE* fp = fopen(path, "rb");
