@@ -77,7 +77,7 @@ namespace Runners
         for (uint i = 0; i < parameters->image_count; i++)
         {
             bool* remembered = sdm.read(data[i]);
-            for (int j = 0; j < 651; j++)
+            for (int j = 0; j < parameters->labels_count; j++)
             {
                 std::string to_write_pred = remembered[j] ? "1" : "0";
                 std::string to_write_true = data[i][j] ? "1" : "0";
@@ -143,9 +143,9 @@ namespace Runners
         report.insert({"all_bits", all_bits});
         report.insert({"correct_100", correct100});
         report.insert({"correct_bits_percent", (100 * (double)(all_bits - incorrect_bits) / all_bits)});
-        report.insert({"min_activations", sdm.get_min_activations()});
-        report.insert({"max_activations", sdm.get_max_activations()});
-        report.insert({"activated_cells_count", sdm.get_activations_num()});
+//        report.insert({"min_activations", sdm.get_min_activations()});
+//        report.insert({"max_activations", sdm.get_max_activations()});
+//        report.insert({"activated_cells_count", sdm.get_activations_num()});
         report.insert({"tp", tp});
         report.insert({"tp_avg", (double)tp / parameters->image_count});
         report.insert({"fp", fp});

@@ -13,23 +13,23 @@ template<typename cell_type, typename index_type, typename summation_type>
 struct SDM_LABELS : SDM_BASE<cell_type, index_type, summation_type>
 {
 public:
-	uint K;
-	uint L;
-	uint M;
-	uint N;
+	ulong K;
+    ulong L;
+    ulong M;
+    ulong N;
 
 	cell_type* cells;
 	index_type* indices;
 	bool* bits;
 
-	uint block_count;
-	uint threads_per_block;
-	uint thread_count;
+    ulong block_count;
+    ulong threads_per_block;
+    ulong thread_count;
 
 	ReadingType reading_type;
 	double bio_threshold;
 
-	SDM_LABELS(uint K, uint L, uint M, uint N, uint block_count, uint threads_per_block, ReadingType reading_type, double bio_threshold = 0.0);
+	SDM_LABELS(ulong K, ulong L, ulong M, ulong N, ulong block_count, ulong threads_per_block, ReadingType reading_type, double bio_threshold = 0.0);
 	~SDM_LABELS();
 
 	bool* read(const bool* value);
@@ -58,8 +58,8 @@ private:
 };
 
 template<typename cell_type, typename index_type, typename summation_type>
-SDM_LABELS<cell_type, index_type, summation_type>::SDM_LABELS(uint K, uint L, uint M, uint N,
-	uint block_count, uint threads_per_block, ReadingType reading_type, double bio_threshold)
+SDM_LABELS<cell_type, index_type, summation_type>::SDM_LABELS(ulong K, ulong L, ulong M, ulong N,
+	ulong block_count, ulong threads_per_block, ReadingType reading_type, double bio_threshold)
 {
 	this->K = K;
 	this->L = L;
@@ -74,7 +74,7 @@ SDM_LABELS<cell_type, index_type, summation_type>::SDM_LABELS(uint K, uint L, ui
 
 	cudaMalloc((void**)&cells, N * (M + 1) * sizeof(cell_type));
 	cudaMalloc((void**)&indices, K * N * sizeof(index_type));
-	cudaMalloc((void**)&bits, K * N * sizeof(bool));
+	//cudaMalloc((void**)&bits, K * N * sizeof(bool));
 
 	init_labels <<<block_count, threads_per_block>>> (cells, indices, bits, K, L, M, N, thread_count);
 }
@@ -84,7 +84,7 @@ SDM_LABELS<cell_type, index_type, summation_type>::~SDM_LABELS()
 {
 	cudaFree(cells);
 	cudaFree(indices);
-	cudaFree(bits);
+	//cudaFree(bits);
 	cudaDeviceSynchronize();
 }
 
@@ -113,8 +113,8 @@ bool* SDM_LABELS<cell_type, index_type, summation_type>::read(const bool* value,
 	activation_counter[0] = 0;
 	cudaMemcpy(cuda_activation_counter, activation_counter, sizeof(int), cudaMemcpyHostToDevice);
 
-	get_activated_cells<cell_type, index_type, summation_type> <<<block_count, threads_per_block>>>
-		(indices, bits, K, M, N, thread_count, cuda_address, cuda_activation_indices, cuda_activation_counter);
+	get_activated_cells_bool<cell_type, index_type, summation_type> <<<block_count, threads_per_block>>>
+		(indices, true, K, M, N, thread_count, cuda_address, cuda_activation_indices, cuda_activation_counter);
 
 	cudaMemcpy(activation_counter, cuda_activation_counter, sizeof(int), cudaMemcpyDeviceToHost);
 	int activated_cells_number = activation_counter[0];
@@ -170,8 +170,8 @@ bool* SDM_LABELS<cell_type, index_type, summation_type>::read(const bool* value,
 		activation_counter[0] = 0;
 		cudaMemcpy(cuda_activation_counter, activation_counter, sizeof(int), cudaMemcpyHostToDevice);
 
-		get_activated_cells<cell_type, index_type, summation_type> <<<block_count, threads_per_block>>>
-			(indices, bits, K, M, N, thread_count, cuda_value, cuda_activation_indices, cuda_activation_counter);
+		get_activated_cells_bool<cell_type, index_type, summation_type> <<<block_count, threads_per_block>>>
+			(indices, true, K, M, N, thread_count, cuda_value, cuda_activation_indices, cuda_activation_counter);
 		cudaDeviceSynchronize();
 
 		cudaMemcpy(activation_counter, cuda_activation_counter, sizeof(int), cudaMemcpyDeviceToHost);
@@ -321,8 +321,8 @@ void SDM_LABELS<cell_type, index_type, summation_type>::write(const bool* value,
 	activation_counter[0] = 0;
 	cudaMemcpy(cuda_activation_counter, activation_counter, sizeof(int), cudaMemcpyHostToDevice);
 
-	get_activated_cells<cell_type, index_type, summation_type> <<<block_count, threads_per_block>>>
-		(indices, bits, K, M, N, thread_count, cuda_address, cuda_activation_indices, cuda_activation_counter);
+	get_activated_cells_bool<cell_type, index_type, summation_type> <<<block_count, threads_per_block>>>
+		(indices, true, K, M, N, thread_count, cuda_address, cuda_activation_indices, cuda_activation_counter);
 	cudaDeviceSynchronize();
 
 	cudaMemcpy(activation_counter, cuda_activation_counter, sizeof(int), cudaMemcpyDeviceToHost);
@@ -330,9 +330,9 @@ void SDM_LABELS<cell_type, index_type, summation_type>::write(const bool* value,
 
 	if (activated_cells_number == 0)
 	{
-		non_writable += 1;
-		for (int i = 0; i < 651; i++)
-			std::cout << value[i];
+//		non_writable += 1;
+//		for (int i = 0; i < 651; i++)
+//			std::cout << value[i];
 	}
 	else
 	{
@@ -365,7 +365,7 @@ cell_type SDM_LABELS<cell_type, index_type, summation_type>::get_min_activations
 	cell_type* cuda_cell;
 	cudaMalloc((void**)&cuda_cell, (M + 1) * sizeof(cell_type));
 
-	for (uint i = 0; i < N; i++)
+	for (ulong i = 0; i < N; i++)
 	{
 		copy_chunk<cell_type> <<<block_count, threads_per_block>>> (cells, cuda_cell, i * (M + 1), (M + 1), thread_count);
 		cudaMemcpy(cell, cuda_cell, (M + 1) * sizeof(cell_type), cudaMemcpyDeviceToHost);
@@ -391,7 +391,7 @@ cell_type SDM_LABELS<cell_type, index_type, summation_type>::get_max_activations
 	cell_type* cuda_cell;
 	cudaMalloc((void**)&cuda_cell, (M + 1) * sizeof(cell_type));
 
-	for (uint i = 0; i < N; i++)
+	for (ulong i = 0; i < N; i++)
 	{
 		copy_chunk<cell_type> <<<block_count, threads_per_block>>> (cells, cuda_cell, i * (M + 1), (M + 1), thread_count);
 		cudaMemcpy(cell, cuda_cell, (M + 1) * sizeof(cell_type), cudaMemcpyDeviceToHost);
@@ -417,7 +417,7 @@ long SDM_LABELS<cell_type, index_type, summation_type>::get_activations_num()
 	cell_type* cuda_cell;
 	cudaMalloc((void**)&cuda_cell, (M + 1) * sizeof(cell_type));
 
-	for (uint i = 0; i < N; i++)
+	for (ulong i = 0; i < N; i++)
 	{
 		copy_chunk<cell_type> <<<block_count, threads_per_block >>> (cells, cuda_cell, i * (M + 1), (M + 1), thread_count);
 		cudaMemcpy(cell, cuda_cell, (M + 1) * sizeof(cell_type), cudaMemcpyDeviceToHost);
@@ -453,7 +453,7 @@ void SDM_LABELS<cell_type, index_type, summation_type>::print_state()
 	bool* cuda_bits_mask;
 	cudaMalloc((void**)&cuda_bits_mask, K * sizeof(bool));
 
-	for (uint i = 0; i < 10; i++)
+	for (ulong i = 0; i < 10; i++)
 	{
 		copy_chunk<index_type> <<<block_count, threads_per_block>>> (indices, cuda_indices_mask, i * K, K, thread_count);
 		cudaMemcpy(indices_mask, cuda_indices_mask, K * sizeof(index_type), cudaMemcpyDeviceToHost);

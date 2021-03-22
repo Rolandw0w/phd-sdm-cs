@@ -111,14 +111,11 @@ __global__
 void init_labels(cell_type* cells, index_type* indices, bool* bits, uint K, uint L, uint M, uint N, int thread_count)
 {
 	int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
+    curandState state;
+    curand_init(thread_num, 0, 0, &state);
 
-	for (uint i = thread_num; i < N; i += thread_count)
+	for (long i = thread_num; i < N; i += thread_count)
 	{
-		for (uint j = 0; j < K; j++)
-		{
-			bits[i * K + j] = 1;
-		}
-
 		for (uint j = 0; j < M + 1; j++)
 		{
 			cells[i * (M + 1) + j] = 0;
@@ -128,15 +125,22 @@ void init_labels(cell_type* cells, index_type* indices, bool* bits, uint K, uint
 		return;
 
 	int index = 0;
-	for (int i = 0; i < M - 1; i++)
-	{
-		for (int j = i + 1; j < M; j++)
-		{
-			indices[index] = (index_type) i;
-			indices[index + 1] = (index_type) j;
-			index += 2;
-		}
-	}
+//	for (int i = 0; i < M - 1; i++)
+//	{
+//		for (int j = i + 1; j < M; j++)
+//		{
+//			indices[index] = (index_type) i;
+//			indices[index + 1] = (index_type) j;
+//			index += 2;
+//		}
+//	}
+    while (true)
+    {
+        if (index >= N)
+            break;
+        indices[index] = (index_type)(L * curand_uniform(&state));
+        index += 1;
+    }
 }
 
 template<typename index_type>
@@ -154,6 +158,23 @@ bool is_activated(index_type* indices, bool* bits, int i, uint K, bool* destinat
 		}
 	}
 	return true;
+}
+
+template<typename index_type>
+__device__
+bool is_activated_bool(index_type* indices, bool flag, int i, uint K, bool* destination_address)
+{
+    for (int j = 0; j < K; j++)
+    {
+        int index = indices[i*K + j];
+
+        bool equal = destination_address[index] == flag;
+        if (!equal)
+        {
+            return false;
+        }
+    }
+    return true;
 }
 
 template<typename index_type, typename value_type>
@@ -185,6 +206,24 @@ void get_activated_cells_cs1(index_type* indices, bool* bits, uint K, uint M, ui
     for (int i = thread_num; i < N; i += thread_count)
     {
         bool activated = is_activated_cs1(indices, bits, i, K, destination_address);
+        if (activated)
+        {
+            int old = atomicAdd(&counter[0], 1);
+            activated_indices[old] = i;
+        }
+    }
+}
+
+
+template<typename cell_type, typename index_type, typename summation_type>
+__global__
+void get_activated_cells_bool(index_type* indices, bool flag, uint K, uint M, uint N,
+                              int thread_count, bool* destination_address, int* activated_indices, int* counter)
+{
+    int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
+    for (int i = thread_num; i < N; i += thread_count)
+    {
+        bool activated = is_activated_bool(indices, flag, i, K, destination_address);
         if (activated)
         {
             int old = atomicAdd(&counter[0], 1);
@@ -314,7 +353,7 @@ void write_jaeckel(cell_type* cells, uint M, int thread_count, cell_type* to_add
 			int cell_index = activated_indices[i];
 			for (int j = thread_num; j < M + 1; j += thread_count)
 			{
-				long ind = cell_index * (M + 1) + j;
+				long long ind = cell_index * (M + 1) + j;
 				cells[ind] = cells[ind] + to_add[j];
 			}
 		}
