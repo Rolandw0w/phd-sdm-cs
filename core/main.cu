@@ -56,7 +56,7 @@ Runners::LabelsRunnerParameters* get_labels_parameters(ReadingType reading_type,
     const uint address_length = 600;
     const uint value_length = 600;
     const uint labels_count = 600;
-    const uint cells_count = 1*1000*1000;
+    const uint cells_count = 3*1000*1000;
     auto* labels_parameters = new Runners::LabelsRunnerParameters(image_count, block_count, threads_per_block,
                                                                   mask_length, cells_count, address_length, value_length,
                                                                   labels_count, reading_type, bio_threshold);
@@ -279,6 +279,25 @@ void labels_knots()
     const int labels_count = 600;
 
     bool** data = get_labels(labels_count, image_num, data_root);
+    bool* cs1_data = get_cs1(labels_count, image_num, data_root);
+
+    for (int i = 0; i < 4; i++)
+    {
+        std::cout << "lbl: ";
+        for (int j = 0; j < labels_count; j++)
+        {
+            std::cout << data[i][j];
+        }
+        std::cout << std::endl;
+        std::cout << "cs1: ";
+        for (int j = 0; j < labels_count; j++)
+        {
+            std::cout << cs1_data[i*labels_count+j];
+        }
+        std::cout << std::endl;
+        std::cout << std::endl;
+    }
+
 
     const double confidence = 0.9;
 

@@ -116,10 +116,10 @@ void init_labels(cell_type* cells, index_type* indices, bool* bits, uint K, uint
 
 	for (long i = thread_num; i < N; i += thread_count)
 	{
-		for (uint j = 0; j < K; j++)
-		{
-            indices[i*K + j] = (index_type)(L * curand_uniform(&state));
-		}
+//		for (uint j = 0; j < K; j++)
+//		{
+//            indices[i*K + j] = (index_type)(L * curand_uniform(&state));
+//		}
 
 		for (uint j = 0; j < M + 1; j++)
 		{
@@ -127,26 +127,26 @@ void init_labels(cell_type* cells, index_type* indices, bool* bits, uint K, uint
 			cells[ind] = 0;
 		}
 	}
-//	if (thread_num != 0)
-//		return;
-//
-//	int index = 0;
-//	for (int i = 0; i < M - 1; i++)
-//	{
-//		for (int j = i + 1; j < M; j++)
-//		{
-//			indices[index] = (index_type) i;
-//			indices[index + 1] = (index_type) j;
-//			index += 2;
-//		}
-//	}
-//	while (true)
-//    {
-//	    if (index >= N)
-//            break;
-//	    indices[index] = (index_type)(L * curand_uniform(&state));
-//        index += 1;
-//    }
+	if (thread_num != 0)
+		return;
+
+	int index = 0;
+	for (int i = 0; i < M - 1; i++)
+	{
+		for (int j = i + 1; j < M; j++)
+		{
+			indices[index] = (index_type) i;
+			indices[index + 1] = (index_type) j;
+			index += 2;
+		}
+	}
+	while (true)
+    {
+	    if (index >= N)
+            break;
+	    indices[index] = (index_type)(L * curand_uniform(&state));
+        index += 1;
+    }
 }
 
 template<typename index_type>

@@ -72,10 +72,10 @@ SDM_LABELS<cell_type, index_type, summation_type>::SDM_LABELS(ulong K, ulong L, 
 	thread_count = this->block_count * this->threads_per_block;
 	this->reading_type = reading_type;
 
-	ulong ln = (long) N;
-	ulong lnm = ln * (M + 1);
+	ulong ln = N;
+	ulong lnm = N * (M + 1);
 	ulong s = sizeof(cell_type);
-	ulong l = lnm * s;
+	ulong l = N * (M + 1) * sizeof(cell_type);
     ulong aaa = N * (M + 1) * sizeof(cell_type);
 
 	cudaMalloc((void**)&cells, l);

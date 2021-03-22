@@ -54,6 +54,8 @@ SDM_CS1<cell_type, index_type, summation_type, value_type>::SDM_CS1(uint K, uint
 
     thread_count = this->block_count * this->threads_per_block;
 
+    auto s = sizeof(cell_type);
+    auto a = N * (M + 1) * sizeof(cell_type);
     cudaMalloc((void**)&cells, N * (M + 1) * sizeof(cell_type));
     cudaMalloc((void**)&indices, K * N * sizeof(index_type));
     cudaMalloc((void**)&bits, K * N * sizeof(bool));
