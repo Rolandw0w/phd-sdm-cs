@@ -26,19 +26,23 @@ report_map Runners::CS1Runner::naive(const std::string& data_path, const std::st
     int columns = 4*parameters->labels_count;
     bool* transformation = (bool*) malloc(rows*columns*sizeof(bool));
     bool* cuda_transformation;
-    cudaMalloc((void**)&cuda_transformation, rows*columns*sizeof(bool));
-    check_errors<int>("cudaMalloc/cuda_transformation");
 
-    generate_small_random_matrix<<<parameters->block_count, parameters->threads_per_block>>>
-                                (rows, columns, cuda_transformation);
-    cudaMemcpy(transformation, cuda_transformation, rows*columns*sizeof(bool), cudaMemcpyDeviceToHost);
-    cudaDeviceSynchronize();
-    check_errors<int>("cudaMemcpy/transformation");
-    uint m = rows*parameters->image_count;
+    cuda_malloc(&cuda_transformation, rows*columns);
+
+    kernel_decorator(
+            generate_small_random_matrix<bool>,
+            parameters->block_count, parameters->threads_per_block, true,
+            rows, columns, cuda_transformation
+    );
+
+    cuda_memcpy_from_gpu(transformation, cuda_transformation, rows*columns);
+
+    uint transformation_size = rows*parameters->image_count;
 
     std::ofstream transformation_file;
-    transformation_file.open(output_path + "\\cs1_matrix_K_" + std::to_string(parameters->mask_length) +
-                  "_I_" + std::to_string(parameters->images_read) + ".csv");
+    auto transformation_file_path = output_path + "\\cs1_matrix_K_" + std::to_string(parameters->mask_length) +
+                                    "_I_" + std::to_string(parameters->images_read) + ".csv";
+    transformation_file.open(transformation_file_path);
 
     for (int i = 0; i < rows; i++)
     {
@@ -55,39 +59,31 @@ report_map Runners::CS1Runner::naive(const std::string& data_path, const std::st
 
     typedef int SUM_TYPE;
 
-    ulong result_bytes = m*sizeof(SUM_TYPE);
-
     SUM_TYPE* cuda_transformed;
-    cudaMalloc((void**)&cuda_transformed, result_bytes);
-    check_errors<int>("cudaMalloc/cuda_transformed");
-    cudaMemset(cuda_transformed, (SUM_TYPE)0, result_bytes);
-    cudaDeviceSynchronize();
 
-    SUM_TYPE* transformed = (SUM_TYPE*) malloc(result_bytes);
-    check_errors<int>("cudaMemset/cuda_transformed");
+    cuda_malloc(&cuda_transformed, transformation_size);
+    cuda_memset(cuda_transformed, (SUM_TYPE)0, transformation_size);
+
+    auto transformed = (SUM_TYPE*) malloc(transformation_size*sizeof(SUM_TYPE));
 
     bool* cuda_data;
-    cudaMalloc((void**)&cuda_data, columns*parameters->image_count*sizeof(bool));
-    check_errors<int>("cudaMalloc/cuda_data");
-    cudaMemcpy(cuda_data, data, columns*parameters->image_count*sizeof(bool), cudaMemcpyHostToDevice);
-    check_errors<int>("cudaMemcpy/cuda_data");
+    cuda_malloc(&cuda_data, columns*parameters->image_count);
+    cuda_memcpy_to_gpu(cuda_data, data, columns*parameters->image_count);
 
-    uint tc = parameters->block_count*parameters->threads_per_block;
-    cudaDeviceSynchronize();
-    mult_matrix<SUM_TYPE><<<parameters->block_count, parameters->threads_per_block>>>
-                (cuda_transformation, cuda_data, cuda_transformed, rows, columns, parameters->image_count, tc);
-    cudaDeviceSynchronize();
-    check_errors<int>("mult_matrix");
-    cudaMemcpy(transformed, cuda_transformed, result_bytes, cudaMemcpyDeviceToHost);
-    cudaDeviceSynchronize();
+    uint thread_count = parameters->block_count*parameters->threads_per_block;
+    kernel_decorator(
+            mult_matrix<SUM_TYPE>,
+            parameters->block_count, parameters->threads_per_block, true,
+            cuda_transformation, cuda_data, cuda_transformed, rows, columns, parameters->image_count, thread_count
+    );
 
-    check_errors<int>("cudaMemcpyResult/transformed2");
-    std::cout << std::endl;
+    cuda_memcpy_from_gpu(transformed, cuda_transformed, transformation_size);
+
     auto max = transformed[0];
     auto max_i = 0;
     auto min = transformed[0];
     auto min_i = 0;
-    for (int i = 1; i < m; i++)
+    for (int i = 1; i < transformation_size; i++)
     {
         auto el = transformed[i];
         if (min > el)
@@ -126,8 +122,8 @@ report_map Runners::CS1Runner::naive(const std::string& data_path, const std::st
         images[i] = image;
     }
 
-    cudaFree(cuda_transformation);
-    cudaFree(cuda_transformed);
+    cuda_free(cuda_transformation);
+    cuda_free(cuda_transformed);
 
     SDM_CS1<int, short, short, short> sdm(parameters->mask_length, parameters->address_length,
                                             parameters->value_length, parameters->cells_count, parameters->block_count,
@@ -146,6 +142,7 @@ report_map Runners::CS1Runner::naive(const std::string& data_path, const std::st
         if ((i+1) % 1000 == 0)
             std::cout << (i+1) << " ";
     }
+    //sdm.print_state();
     std::cout << std::endl ;
     long write_time = clock() - write_time_start;
 
@@ -182,6 +179,7 @@ report_map Runners::CS1Runner::naive(const std::string& data_path, const std::st
         for (int j = 0; j < parameters->value_length; j++)
         {
             double rem = remembered[j];
+            //std::cout << rem << " ";
             auto sep = (j == parameters->value_length - 1) ? "\n" : ",";
             restored << rem << sep;
             if (abs(rem) > 1e-6)

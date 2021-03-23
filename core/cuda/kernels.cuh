@@ -257,15 +257,16 @@ void read_jaeckel(cell_type* cells, int* activated_indices, uint M, int thread_c
 
 template <typename cell_type, typename sum_type>
 __global__
-void get_acts_sum(cell_type* cells, int* activated_indices, uint M, int* activation_counter, sum_type* sum_act)
+void get_acts_sum(cell_type* cells, int* activated_indices, uint M, int* activation_counter, sum_type* sum_act, int thread_count)
 {
     int activated_cells_number = activation_counter[0];
     int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (thread_num < activated_cells_number)
+    for (int i = thread_num; i  < activated_cells_number; i += thread_count)
     {
-        int activated_index = activated_indices[thread_num];
-        cell_type m = cells[activated_index * (M + 1) + M];
+        ulong activated_index = activated_indices[i];
+        ulong cell_index = activated_index * (M + 1) + M;
+        cell_type m = cells[cell_index];
         atomicAdd(&sum_act[0], m);
     }
 }
@@ -281,35 +282,50 @@ void read_cs1(cell_type* cells, int* activated_indices, uint M, int thread_count
     {
         for (int i = 0; i < activated_cells_number; i++)
         {
-            int activated_index = activated_indices[i];
+            ulong activated_index = activated_indices[i];
             for (int j = thread_num; j < M; j += thread_count)
             {
-                sum[j] += (((double) cells[activated_index * (M + 1) + j]) / sum_act[0]);
+                ulong cell_index = activated_index * (M + 1) + j;
+                sum[j] += cells[cell_index];
             }
         }
-        //printf("%d %d\n", thread_num, sum[thread_num]);
+    }
+    __syncthreads();
+    if (thread_num == 0)
+    {
+        for (int j = 0; j < M; j++)
+        {
+            sum[j] /= sum_act[0];
+        }
     }
 }
 
 template<typename cell_type, typename index_type, typename summation_type>
 __global__
-void read_cs1_2(cell_type* cells, int* activated_indices, uint M, int thread_count, double* sum, int activated_cells_number)
+void read_cs1_v2(cell_type* cells, int* activated_indices, uint M, int thread_count, double* sum, int* activation_counter, int* sum_act)
 {
+    int activated_cells_number = activation_counter[0];
     int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (thread_num < M)
     {
-
-        for (int i = 0; i < activated_cells_number; i++)
+        for (int i = thread_num; i < activated_cells_number; i+=thread_count)
         {
-            int activated_index = activated_indices[i];
-            cell_type m = cells[activated_index * (M + 1) + M];
-            for (int j = thread_num; j < M; j += thread_count)
+            ulong activated_index = activated_indices[i];
+            for (int j = 0; j < M; j++)
             {
-                sum[j] += (((double) cells[activated_index * (M + 1) + j]) / m);
+                ulong cell_index = activated_index * (M + 1) + j;
+                sum[j] += cells[cell_index];
             }
         }
-        //printf("%d %d\n", thread_num, sum[thread_num]);
+    }
+    __syncthreads();
+    if (thread_num == 0)
+    {
+        for (int j = 0; j < M; j++)
+        {
+            sum[j] /= sum_act[0];
+        }
     }
 }
 
@@ -365,15 +381,33 @@ void write_cs1(cell_type* cells, uint M, int thread_count, value_type* to_add, i
     {
         for (int i = 0; i < activated_cells_number; i++)
         {
-            int cell_index = activated_indices[i];
+            ulong cell_index = activated_indices[i];
             for (int j = thread_num; j < M; j += thread_count)
             {
-                long ind = cell_index * (M + 1) + j;
+                ulong ind = cell_index * (M + 1) + j;
                 cells[ind] = cells[ind] + to_add[j];
             }
             if (thread_num == 0)
                 cells[cell_index * (M + 1) + M] += 1;
         }
+    }
+}
+
+template<typename cell_type, typename index_type, typename value_type>
+__global__
+void write_cs1_v2(cell_type* cells, uint M, int thread_count, value_type* to_add, int* activated_indices, int activated_cells_number)
+{
+    int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
+
+    for (int i = thread_num; i < activated_cells_number; i += thread_count)
+    {
+        ulong cell_index = activated_indices[i];
+        for (int j = 0; j < M; j++)
+        {
+            ulong ind = cell_index * (M + 1) + j;
+            cells[ind] += to_add[j];
+        }
+        cells[cell_index * (M + 1) + M] += 1;
     }
 }
 

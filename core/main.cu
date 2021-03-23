@@ -33,7 +33,7 @@ Runners::CS1RunnerParameters* get_cs1_parameters()
     const uint image_count = 9000;
     const uint image_read = 9000;
     const uint block_count = 64;
-    const uint threads_per_block = 512;
+    const uint threads_per_block = 1024;
     const uint bits_per_num = 1;
     const uint mask_length = 10;
     const uint labels_count = 150;

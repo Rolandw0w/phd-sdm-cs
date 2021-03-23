@@ -324,7 +324,7 @@ void SDM_LABELS<cell_type, index_type, summation_type>::write(const bool* value,
 	cudaMemcpy(cuda_activation_counter, activation_counter, sizeof(int), cudaMemcpyHostToDevice);
 
 	kernel_decorator(get_activated_cells_bool<cell_type, index_type, summation_type>,
-                     block_count, threads_per_block,
+                     block_count, threads_per_block, true,
                      indices, true, K, M, N, thread_count, cuda_address, cuda_activation_indices, cuda_activation_counter);
 
 //	get_activated_cells_bool<cell_type, index_type, summation_type> <<<block_count, threads_per_block>>>

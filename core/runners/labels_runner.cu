@@ -63,7 +63,7 @@ namespace Runners
         restored.open(output_path + "\\labels_" + mode + "_K_" + std::to_string(parameters->mask_length) +
                       "_I_" + std::to_string(parameters->images_read) + ".csv");
 
-        for (uint i = 18; i < parameters->images_read; i++)
+        for (uint i = 0; i < parameters->images_read; i++)
         {
             bool* remembered = sdm.read(data[i]);
             int dist = hamming_distance(data[i], remembered, parameters->labels_count);
