@@ -477,8 +477,8 @@ int main(int argc, char** argv)
     output_root = argv[3];
     std::string experiment_num = argv[4];
     int experiment_num_int = std::stoi(experiment_num);
-    if (experiment_num_int < 1 || experiment_num_int > 3)
-        throw std::invalid_argument("Only {1,2,3} experiments are available now");
+    if (experiment_num_int < 1 || experiment_num_int > 4)
+        throw std::invalid_argument("Only {1,2,3,4} experiments are available now");
 
     typedef std::pair < std::string, std::function<void(void)>> test_type;
     std::vector<test_type> tests;
@@ -502,6 +502,13 @@ int main(int argc, char** argv)
     {
         //tests.emplace_back( "Plain test with matrix transformation (1)", cs1_naive_grid1 );
         //tests.emplace_back( "Plain test with matrix transformation (2)", cs1_naive_grid2 );
+        tests.emplace_back( "Compressed sensing (image count grid)", cs1_image_count_grid );
+    }
+    if (experiment_num_int == 4)
+    {
+        //tests.emplace_back( "Plain test with matrix transformation (1)", cs1_naive_grid1 );
+        //tests.emplace_back( "Plain test with matrix transformation (2)", cs1_naive_grid2 );
+        tests.emplace_back( "Plain test with labels (knots)", labels_knots );
         tests.emplace_back( "Compressed sensing (image count grid)", cs1_image_count_grid );
     }
 

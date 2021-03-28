@@ -97,6 +97,21 @@ double* SDM_CS1<cell_type, index_type, summation_type, value_type>::read(const v
 
     cuda_memcpy_from_gpu(activation_counter, cuda_activation_counter, 1);
 
+    if (activation_counter[0] == 0)
+    {
+        double* result = (double*) malloc(M * sizeof(double));
+        memset(result, 0, M * sizeof(double));
+
+        free(activation_counter);
+
+        cuda_free(cuda_activation_counter);
+        cuda_free(cuda_activation_indices);
+        cuda_free(cuda_sum);
+        cuda_free(cuda_value);
+
+        return result;
+    }
+
     int* cuda_sum_act;
     cuda_malloc(&cuda_sum_act, 1);
     kernel_decorator(
@@ -111,13 +126,12 @@ double* SDM_CS1<cell_type, index_type, summation_type, value_type>::read(const v
             cells, cuda_activation_indices, M, thread_count, cuda_sum, cuda_activation_counter, cuda_sum_act
     );
 
-    cuda_free(cuda_activation_counter);
-
-    free(activation_counter);
-
     double* result = (double*) malloc(M * sizeof(double));
     cuda_memcpy_from_gpu(result, cuda_sum, M);
 
+    free(activation_counter);
+
+    cuda_free(cuda_activation_counter);
     cuda_free(cuda_activation_indices);
     cuda_free(cuda_sum);
     cuda_free(cuda_value);
