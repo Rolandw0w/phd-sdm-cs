@@ -26,7 +26,7 @@ add_executable(
         core/utils/utils.hpp
         core/runners/cs1_runner.cuh
         core/runners/cs1_runner.cu
-        core/cuda/functions.cuh core/sdm/sdm_cs1.cuh)
+        core/cuda/functions.cuh core/sdm/sdm_cs1.cuh core/sdm/sdm_kanerva.cuh core/runners/kanerva_runner.cuh core/runners/kanerva_runner.cu)
 
 set_source_files_properties(core/data_ops/data_reader.cpp PROPERTIES LANGUAGE CUDA)
 set_source_files_properties(core/data_ops/data_writer.cpp PROPERTIES LANGUAGE CUDA)

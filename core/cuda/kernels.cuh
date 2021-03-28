@@ -43,6 +43,29 @@ void init_jaeckel(cell_type* cells, index_type* indices, bool* bits, uint K, uin
 }
 
 
+template<typename cell_type>
+__global__
+void init_kanerva(cell_type* cells, bool* addresses, uint L, uint M, uint N, int thread_count)
+{
+    int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
+    curandState state;
+    curand_init(thread_num, 0, 0, &state);
+
+    for (uint i = thread_num; i < N; i += thread_count)
+    {
+        for (uint j = 0; j < M + 1; j++)
+        {
+            cells[i*(M + 1) + j] = 0;
+        }
+        for (uint j = 0; j < L; j++)
+        {
+            double rand = curand_uniform(&state);
+            addresses[i*L + j] = rand > 0.5;
+        }
+    }
+}
+
+
 template<typename cell_type, typename index_type>
 __global__
 void init_cs1(cell_type* cells, index_type* indices, uint K, uint L, uint M, uint N, int thread_count)
@@ -233,6 +256,40 @@ void get_activated_cells(index_type* indices, bool* bits, uint K, uint M, uint N
 			activated_indices[old] = i;
 		}
 	}
+}
+
+template<typename dist_type>
+__device__
+bool is_activated_kanerva(bool* addresses, bool* destination_address, uint i, uint L, uint d)
+{
+    dist_type dist = 0;
+    for (int l = 0; l < L; l++)
+    {
+        bool flag = addresses[i*L + l];
+        bool index_dist = flag ^ destination_address[l];
+        dist += index_dist;
+        if (dist > d)
+            return false;
+    }
+    return true;
+}
+
+
+template<typename index_type>
+__global__
+void get_activated_cells_kanerva(bool* addresses, uint L, uint N, uint d,
+                           int thread_count, bool* destination_address, int* activated_indices, int* counter)
+{
+    int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
+    for (uint i = thread_num; i < N; i += thread_count)
+    {
+        bool activated = is_activated_kanerva<uint>(addresses, destination_address, i, L, d);
+        if (activated)
+        {
+            int old = atomicAdd(&counter[0], 1);
+            activated_indices[old] = i;
+        }
+    }
 }
 
 template<typename cell_type, typename index_type, typename summation_type>

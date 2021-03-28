@@ -53,77 +53,87 @@ SDM_JAECKEL<cell_type, index_type, summation_type>::SDM_JAECKEL(uint K, uint L, 
 
 	thread_count = this->block_count * this->threads_per_block;
 
-	cudaMalloc((void**)&cells, N * (M + 1) * sizeof(cell_type));
-	cudaMalloc((void**)&indices, K * N * sizeof(index_type));
-	cudaMalloc((void**)&bits, K * N * sizeof(bool));
+	cuda_malloc(&cells, N * (M + 1));
+    cuda_malloc(&indices, K * N);
+    cuda_malloc(&bits, K * N);
 
-	init_jaeckel<<<block_count, threads_per_block>>> (cells, indices, bits, K, L, M, N, thread_count);
+    kernel_decorator(
+            init_jaeckel<cell_type, index_type>,
+            block_count, threads_per_block, true,
+            cells, indices, bits, K, L, M, N, thread_count
+    );
 }
 
 template<typename cell_type, typename index_type, typename summation_type>
 SDM_JAECKEL<cell_type, index_type, summation_type>::~SDM_JAECKEL()
 {
-	cudaFree(cells);
-	cudaFree(indices);
-	cudaFree(bits);
-	cudaDeviceSynchronize();
+	cuda_free(cells);
+    cuda_free(indices);
+    cuda_free(bits);
 }
 
 template<typename cell_type, typename index_type, typename summation_type>
 bool* SDM_JAECKEL<cell_type, index_type, summation_type>::read(const bool* value, const bool* address)
 {
 	bool* cuda_value;
-	cudaMalloc((void **)&cuda_value, M * sizeof(bool));
-	cudaMemcpy(cuda_value, value, M * sizeof(bool), cudaMemcpyHostToDevice);
+	cuda_malloc(&cuda_value, M);
+	cuda_memcpy_to_gpu(cuda_value, value, M);
 
 	int* cuda_activation_indices;
-	cudaMalloc((void **)&cuda_activation_indices, N * sizeof(int));
+    cuda_malloc(&cuda_activation_indices, N);
 
 	summation_type* cuda_sum;
-	cudaMalloc((void **)&cuda_sum, M * sizeof(summation_type));
-	cudaMemset(cuda_sum, 0, M * sizeof(summation_type));
+	cuda_malloc(&cuda_sum, M);
+	cuda_memset(cuda_sum, 0, M);
 
 	bool* cuda_result;
-	cudaMalloc((void**)&cuda_result, M * sizeof(bool));
+    cuda_malloc(&cuda_result, M);
 
 	bool* cuda_address;
-	cudaMalloc((void **)&cuda_address, L * sizeof(bool));
-	cudaMemcpy(cuda_address, address, L * sizeof(bool), cudaMemcpyHostToDevice);
+    cuda_malloc(&cuda_address, L);
+	cuda_memcpy_to_gpu(cuda_address, address, L);
 
 	int* cuda_activation_counter;
-	cudaMalloc((void **)&cuda_activation_counter, sizeof(int));
+    cuda_malloc(&cuda_activation_counter, 1);
 
 	int* activation_counter = (int*)malloc(sizeof(int));
 	activation_counter[0] = 0;
-	cudaMemcpy(cuda_activation_counter, activation_counter, sizeof(int), cudaMemcpyHostToDevice);
+    cuda_memcpy_to_gpu(cuda_activation_counter, activation_counter, 1);
 
-	get_activated_cells<cell_type, index_type, summation_type> <<<block_count, threads_per_block>>>
-		(indices, bits, K, M, N, thread_count, cuda_address, cuda_activation_indices, cuda_activation_counter);
+    kernel_decorator(
+            get_activated_cells<cell_type, index_type, summation_type>,
+            block_count, threads_per_block, true,
+            indices, bits, K, M, N, thread_count, cuda_address, cuda_activation_indices, cuda_activation_counter
+    );
 
-	cudaMemcpy(activation_counter, cuda_activation_counter, sizeof(int), cudaMemcpyDeviceToHost);
+	cuda_memcpy_from_gpu(activation_counter, cuda_activation_counter, 1);
 	int activated_cells_number = activation_counter[0];
 
-	read_jaeckel<cell_type, index_type, summation_type> <<<block_count, threads_per_block>>>
-		(cells, cuda_activation_indices, M, thread_count, cuda_sum, activated_cells_number);
+    kernel_decorator(
+            read_jaeckel<cell_type, index_type, summation_type>,
+            block_count, threads_per_block, true,
+            cells, cuda_activation_indices, M, thread_count, cuda_sum, activated_cells_number
+    );
 
-	get_result<summation_type> <<<block_count, threads_per_block>>>
-		(cuda_sum, cuda_value, M, thread_count);
+    kernel_decorator(
+            get_result<summation_type>,
+            block_count, threads_per_block, true,
+            cuda_sum, cuda_value, M, thread_count, 0.0
+    );
 
-	cudaFree(cuda_activation_counter);
-	cudaMemset(cuda_sum, 0, M * sizeof(summation_type));
+	cuda_free(cuda_activation_counter);
+	cuda_memset(cuda_sum, 0, M);
 
 	bool* result = (bool*)malloc(M * sizeof(bool));
-	cudaMemcpy(result, cuda_result, M * sizeof(bool), cudaMemcpyDeviceToHost);
-    cudaDeviceSynchronize();
+	cuda_memcpy_from_gpu(result, cuda_result, M);
 
 	free(activation_counter);
 
-	cudaFree(cuda_address);
-	cudaFree(cuda_activation_indices);
-	cudaFree(cuda_result);
-	cudaFree(cuda_sum);
-	cudaFree(cuda_value);
-	cudaDeviceSynchronize();
+    cuda_free(cuda_address);
+    cuda_free(cuda_activation_indices);
+    cuda_free(cuda_result);
+    cuda_free(cuda_sum);
+    cuda_free(cuda_value);
 
 	return result;
 }
@@ -138,102 +148,60 @@ template<typename cell_type, typename index_type, typename summation_type>
 bool* SDM_JAECKEL<cell_type, index_type, summation_type>::read(const bool* value, const int iter_num)
 {
 	bool* cuda_value;
-	cudaMalloc((void **)&cuda_value, M * sizeof(bool));
-    check_errors<int>();
-	cudaMemcpy(cuda_value, value, M * sizeof(bool), cudaMemcpyHostToDevice);
-    check_errors<int>();
+	cuda_malloc(&cuda_value, M);
+	cuda_memcpy_to_gpu(cuda_value, value, M);
 
 	int* cuda_activation_indices;
-	cudaMalloc((void **)&cuda_activation_indices, N * sizeof(int));
-    check_errors<int>();
+    cuda_malloc(&cuda_activation_indices, N);
 
 	summation_type* cuda_sum;
-	cudaMalloc((void **)&cuda_sum, M * sizeof(summation_type));
-    check_errors<int>();
-	cudaMemset(cuda_sum, 0, M * sizeof(summation_type));
-    check_errors<int>();
+    cuda_malloc(&cuda_sum, M);
+	cuda_memset(cuda_sum, 0, M);
 
 	for (int i = 0; i < iter_num; i++)
 	{
 		int* cuda_activation_counter;
-		cudaMalloc((void **)&cuda_activation_counter, sizeof(int));
-        check_errors<int>();
+        cuda_malloc(&cuda_activation_counter, 1);
 
 		int* activation_counter = (int*)malloc(sizeof(int));
 		activation_counter[0] = 0;
-		cudaMemcpy(cuda_activation_counter, activation_counter, sizeof(int), cudaMemcpyHostToDevice);
-        check_errors<int>();
+        cuda_memcpy_to_gpu(cuda_activation_counter, activation_counter, 1);
 
-		get_activated_cells<cell_type, index_type, summation_type> <<<block_count, threads_per_block>>>
-			(indices, bits, K, M, N, thread_count, cuda_value, cuda_activation_indices, cuda_activation_counter);
-		cudaDeviceSynchronize();
-        check_errors<int>();
+        kernel_decorator(
+                get_activated_cells<cell_type, index_type, summation_type>,
+                block_count, threads_per_block, true,
+                indices, bits, K, M, N, thread_count, cuda_value, cuda_activation_indices, cuda_activation_counter
+        );
 
-		cudaMemcpy(activation_counter, cuda_activation_counter, sizeof(int), cudaMemcpyDeviceToHost);
-        check_errors<int>();
+		cuda_memcpy_from_gpu(activation_counter, cuda_activation_counter, 1);
 		int activated_cells_number = activation_counter[0];
-        //std::cout << activated_cells_number << ",";
-//        std::cout << std::endl;
-//        std::cout << std::endl;
-//        std::cout << std::endl;
-//        std::cout << activated_cells_number << ",";
-		//std::cout << activated_cells_number << ",";
-//		if (activated_cells_number != 0)
-//        {
-//		    for(int j = 0; j < M; j++)
-//            {
-//		        std::cout << value[j];
-//            }
-//		    std::cout << std::endl;
-//        }
 
-		read_jaeckel<cell_type, index_type, summation_type> <<<block_count, threads_per_block>>>
-			(cells, cuda_activation_indices, M, thread_count, cuda_sum, activated_cells_number);
-		cudaDeviceSynchronize();
-        check_errors<int>();
+        kernel_decorator(
+                read_jaeckel<cell_type, index_type, summation_type>,
+                block_count, threads_per_block, true,
+                cells, cuda_activation_indices, M, thread_count, cuda_sum, activated_cells_number
+        );
+
         summation_type* sum = (summation_type*)malloc(M*sizeof(summation_type));
-        cudaMemcpy(sum, cuda_sum, M * sizeof(summation_type), cudaMemcpyDeviceToHost);
-        cudaDeviceSynchronize();
-        check_errors<int>();
-//        std::cout << std::endl;
-//        std::cout << std::endl;
-//        std::cout << std::endl;
-//        for (int j = 0; j < 10; j++)
-//            std::cout << sum[j] << ",";
-		    //std::cout << std::endl;
+        cuda_memcpy_from_gpu(sum, cuda_sum, M);
 
-		get_result<summation_type> <<<block_count, threads_per_block>>>
-			(cuda_sum, cuda_value, M, thread_count);
-		cudaDeviceSynchronize();
-        check_errors<int>();
+        kernel_decorator(
+                get_result<summation_type>,
+                block_count, threads_per_block, true,
+                cuda_sum, cuda_value, M, thread_count, 0.0
+        );
 
-		cudaFree(cuda_activation_counter);
-		cudaMemset(cuda_sum, 0, M * sizeof(summation_type));
+		cuda_free(cuda_activation_counter);
+		cuda_memset(cuda_sum, 0, M);
 
 		free(activation_counter);
-
-		cudaDeviceSynchronize();
-        check_errors<int>();
 	}
-	cudaDeviceSynchronize();
-    check_errors<int>();
 	bool* result = (bool*)malloc(M * sizeof(bool));
-	cudaMemcpy(result, cuda_value, M * sizeof(bool), cudaMemcpyDeviceToHost);
-    check_errors<int>();
+	cuda_memcpy_from_gpu(result, cuda_value, M);
 
-	cudaFree(cuda_activation_indices);
-	cudaFree(cuda_sum);
-	cudaFree(cuda_value);
-	cudaDeviceSynchronize();
-    check_errors<int>();
-
-//    std::cout << std::endl;
-//    for (int i = 0; i < M; i++)
-//        std::cout << result[i] << ",";
-//    std::cout << std::endl;
-//    for (int i = 0; i < M; i++)
-//        std::cout << value[i] << ",";
-//    std::cout << std::endl;
+    cuda_free(cuda_activation_indices);
+    cuda_free(cuda_sum);
+    cuda_free(cuda_value);
 
 	return result;
 }
@@ -261,61 +229,54 @@ void SDM_JAECKEL<cell_type, index_type, summation_type>::write(const bool *value
 {
 
 	bool* cuda_value;
-	cudaMalloc((void **)&cuda_value, M * sizeof(bool));
-    check_errors<int>();
-	cudaMemcpy(cuda_value, value, M * sizeof(bool), cudaMemcpyHostToDevice);
-    check_errors<int>();
+	cuda_malloc(&cuda_value, M);
+	cuda_memcpy_to_gpu(cuda_value, value, M);
 
 	bool* cuda_address;
-	cudaMalloc((void **)&cuda_address, L * sizeof(bool));
-    check_errors<int>();
-	cudaMemcpy(cuda_address, address, L * sizeof(bool), cudaMemcpyHostToDevice);
-    check_errors<int>();
+	cudaMalloc((void **)&cuda_address, L);
+    cuda_memcpy_to_gpu(cuda_address, address, L);
 
 	cell_type* cuda_to_add;
-	cudaMalloc((void **)&cuda_to_add, (M + 1) * sizeof(cell_type));
-    check_errors<int>();
-	get_array_to_add <<<block_count, threads_per_block>>> (cuda_value, cuda_to_add, M, times, thread_count);
-    check_errors<int>();
-	cudaDeviceSynchronize();
+    cuda_malloc(&cuda_to_add, M + 1);
+
+    kernel_decorator(
+            get_array_to_add<cell_type>,
+            block_count, threads_per_block, true,
+            cuda_value, cuda_to_add, M, times, thread_count
+    );
 
 	int* cuda_activation_indices;
-	cudaMalloc((void **)&cuda_activation_indices, N * sizeof(int));
-    check_errors<int>();
+    cuda_malloc(&cuda_activation_indices, N);
 
 	int* cuda_activation_counter;
-	cudaMalloc((void **)&cuda_activation_counter, sizeof(int));
-    check_errors<int>();
+    cuda_malloc(&cuda_activation_counter, 1);
 
 	int* activation_counter = (int*)malloc(sizeof(int));
 	activation_counter[0] = 0;
-	cudaMemcpy(cuda_activation_counter, activation_counter, sizeof(int), cudaMemcpyHostToDevice);
-    check_errors<int>();
+	cuda_memcpy_to_gpu(cuda_activation_counter, activation_counter, 1);
 
-	get_activated_cells<cell_type, index_type, summation_type> <<<block_count, threads_per_block>>>
-		(indices, bits, K, M, N, thread_count, cuda_address, cuda_activation_indices, cuda_activation_counter);
-    check_errors<int>();
-	cudaDeviceSynchronize();
+    kernel_decorator(
+            get_activated_cells<cell_type, index_type, summation_type>,
+            block_count, threads_per_block, true,
+            indices, bits, K, M, N, thread_count, cuda_address, cuda_activation_indices, cuda_activation_counter
+    );
 
-	cudaMemcpy(activation_counter, cuda_activation_counter, sizeof(int), cudaMemcpyDeviceToHost);
-    check_errors<int>();
+	cuda_memcpy_from_gpu(activation_counter, cuda_activation_counter, 1);
 	int activated_cells_number = activation_counter[0];
-	//std::cout << activated_cells_number << ",";
 
-	write_jaeckel<cell_type, index_type> <<<block_count, threads_per_block>>>
-		(cells, M, thread_count, cuda_to_add, cuda_activation_indices, activated_cells_number);
-	cudaDeviceSynchronize();
-    check_errors<int>();
+    kernel_decorator(
+            write_jaeckel<cell_type, index_type>,
+            block_count, threads_per_block, true,
+            cells, M, thread_count, cuda_to_add, cuda_activation_indices, activated_cells_number
+    );
 
-	cudaFree(cuda_activation_counter);
-	cudaFree(cuda_activation_indices);
-	cudaFree(cuda_address);
-	cudaFree(cuda_to_add);
-	cudaFree(cuda_value);
-	cudaDeviceSynchronize();
-    check_errors<int>();
+    free(activation_counter);
 
-	free(activation_counter);
+	cuda_free(cuda_activation_counter);
+    cuda_free(cuda_activation_indices);
+    cuda_free(cuda_address);
+    cuda_free(cuda_to_add);
+    cuda_free(cuda_value);
 }
 
 template<typename cell_type, typename index_type, typename summation_type>
@@ -326,12 +287,17 @@ cell_type SDM_JAECKEL<cell_type, index_type, summation_type>::get_min_activation
 	cell_type* cell = (cell_type*)malloc((M + 1) * sizeof(cell_type));
 
 	cell_type* cuda_cell;
-	cudaMalloc((void **)&cuda_cell, (M + 1) * sizeof(cell_type));
+	cuda_malloc(&cuda_cell, M + 1);
 
 	for (uint i = 0; i < N; i++)
 	{
-		copy_chunk<cell_type> <<<block_count, threads_per_block>>> (cells, cuda_cell, i*(M + 1), (M + 1), thread_count);
-		cudaMemcpy(cell, cuda_cell, (M + 1) * sizeof(cell_type), cudaMemcpyDeviceToHost);
+	    kernel_decorator(
+                copy_chunk<cell_type>,
+                block_count, threads_per_block, true,
+                cells, cuda_cell, i*(M + 1), (M + 1), thread_count
+	    );
+
+		cuda_memcpy_from_gpu(cell, cuda_cell, M + 1);
 
 		if (min > cell[M])
 		{
@@ -339,7 +305,7 @@ cell_type SDM_JAECKEL<cell_type, index_type, summation_type>::get_min_activation
 		}
 	}
 	free(cell);
-	cudaFree(cuda_cell);
+	cuda_free(cuda_cell);
 
 	return min;
 }
@@ -352,20 +318,25 @@ cell_type SDM_JAECKEL<cell_type, index_type, summation_type>::get_max_activation
 	cell_type* cell = (cell_type*)malloc((M + 1) * sizeof(cell_type));
 
 	cell_type* cuda_cell;
-	cudaMalloc((void **)&cuda_cell, (M + 1) * sizeof(cell_type));
+    cuda_malloc(&cuda_cell, M + 1);
 
 	for (uint i = 0; i < N; i++)
 	{
-		copy_chunk<cell_type> <<<block_count, threads_per_block>>> (cells, cuda_cell, i*(M + 1), (M + 1), thread_count);
-		cudaMemcpy(cell, cuda_cell, (M + 1) * sizeof(cell_type), cudaMemcpyDeviceToHost);
+        kernel_decorator(
+                copy_chunk<cell_type>,
+                block_count, threads_per_block, true,
+                cells, cuda_cell, i*(M + 1), (M + 1), thread_count
+        );
+
+        cuda_memcpy_from_gpu(cell, cuda_cell, M + 1);
 
 		if (max < cell[M])
 		{
 			max = cell[M];
 		}
 	}
-	free(cell);
-	cudaFree(cuda_cell);
+    free(cell);
+    cuda_free(cuda_cell);
 
 	return max;
 }
@@ -378,12 +349,16 @@ long SDM_JAECKEL<cell_type, index_type, summation_type>::get_activations_num()
 	cell_type* cell = (cell_type*)malloc((M + 1) * sizeof(cell_type));
 
 	cell_type* cuda_cell;
-	cudaMalloc((void **)&cuda_cell, (M + 1) * sizeof(cell_type));
+    cuda_malloc(&cuda_cell, M + 1);
 
 	for (uint i = 0; i < N; i++)
 	{
-		copy_chunk<cell_type> <<<block_count, threads_per_block>>> (cells, cuda_cell, i*(M + 1), (M + 1), thread_count);
-		cudaMemcpy(cell, cuda_cell, (M + 1) * sizeof(cell_type), cudaMemcpyDeviceToHost);
+        kernel_decorator(
+                copy_chunk<cell_type>,
+                block_count, threads_per_block, true,
+                cells, cuda_cell, i*(M + 1), (M + 1), thread_count
+        );
+        cuda_memcpy_from_gpu(cell, cuda_cell, M + 1);
 
 		if (cell[M] != 0)
 		{
@@ -394,8 +369,8 @@ long SDM_JAECKEL<cell_type, index_type, summation_type>::get_activations_num()
 			throw std::invalid_argument("negative activations");
 		}
 	}
-	free(cell);
-	cudaFree(cuda_cell);
+    free(cell);
+    cuda_free(cuda_cell);
 
 	return activations;
 }
@@ -408,21 +383,28 @@ void SDM_JAECKEL<cell_type, index_type, summation_type>::print_state()
 	bool* bits_mask = (bool*)malloc(K * sizeof(bool));
 
 	cell_type* cuda_cell;
-	cudaMalloc((void **)&cuda_cell, (M + 1) * sizeof(cell_type));
+	cuda_malloc(&cuda_cell, M + 1);
 
 	index_type* cuda_indices_mask;
-	cudaMalloc((void **)&cuda_indices_mask, K * sizeof(index_type));
+    cuda_malloc(&cuda_indices_mask, K);
 
 	bool* cuda_bits_mask;
-	cudaMalloc((void **)&cuda_bits_mask, K * sizeof(bool));
+    cuda_malloc(&cuda_bits_mask, K);
 
 	for (uint i = 0; i < 10; i++)
 	{
-		copy_chunk<index_type> <<<block_count, threads_per_block>>> (indices, cuda_indices_mask, i*K, K, thread_count);
-		cudaMemcpy(indices_mask, cuda_indices_mask, K * sizeof(index_type), cudaMemcpyDeviceToHost);
-
-		copy_chunk<bool> <<<block_count, threads_per_block>>> (bits, cuda_bits_mask, i*K, K, thread_count);
-		cudaMemcpy(bits_mask, cuda_bits_mask, K * sizeof(bool), cudaMemcpyDeviceToHost);
+	    kernel_decorator(
+                copy_chunk<index_type>,
+                block_count, threads_per_block, true,
+                indices, cuda_indices_mask, i*K, K, thread_count
+	    );
+	    cuda_memcpy_from_gpu(indices_mask, cuda_indices_mask, K);
+        kernel_decorator(
+                copy_chunk<bool>,
+                block_count, threads_per_block, true,
+                bits, cuda_bits_mask, i*K, K, thread_count
+        );
+        cuda_memcpy_from_gpu(bits_mask, cuda_bits_mask, K);
 
 		std::cout << "[";
 		for (uint k = 0; k < K; k++)
@@ -433,17 +415,21 @@ void SDM_JAECKEL<cell_type, index_type, summation_type>::print_state()
 
 		std::cout << "	---->	";
 
-		copy_chunk<cell_type> <<<block_count, threads_per_block>>> (cells, cuda_cell, i*(M + 1), (M + 1), thread_count);
-		cudaMemcpy(cell, cuda_cell, (M + 1) * sizeof(cell_type), cudaMemcpyDeviceToHost);
+        kernel_decorator(
+                copy_chunk<cell_type>,
+                block_count, threads_per_block, true,
+                cells, cuda_cell, i*(M + 1), (M + 1), thread_count
+        );
+		cuda_memcpy_from_gpu(cell, cuda_cell, M + 1);
 		for (uint j = 0; j < M + 1; j++)
 		{
 			std::cout << cell[j] << "  ";
 		}
 		std::cout << std::endl;
 	}
-	cudaFree(cuda_cell);
-	cudaFree(cuda_indices_mask);
-	cudaFree(cuda_bits_mask);
+	cuda_free(cuda_cell);
+    cuda_free(cuda_indices_mask);
+    cuda_free(cuda_bits_mask);
 
 	free(cell);
 	free(indices_mask);
