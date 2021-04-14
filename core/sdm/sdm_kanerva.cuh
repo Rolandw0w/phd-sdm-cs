@@ -12,6 +12,7 @@ public:
     uint L;
     uint M;
     uint N;
+    double p0;
 
     cell_type* cells;
     bool* addresses;
@@ -20,27 +21,30 @@ public:
     uint threads_per_block;
     uint thread_count;
 
-    SDM_KANERVA(uint d, uint L, uint M, uint N, uint block_count, uint threads_per_block);
+    SDM_KANERVA(uint d, uint L, uint M, uint N, uint block_count, uint threads_per_block, double p0);
     ~SDM_KANERVA();
 
     bool* read(const bool* value);
     bool* read(const bool* value, int iter_count);
     bool* read(const bool* value, const bool* address);
 
-    void write(const bool *value);
-    void write(const bool *value, const int times);
-    void write(const bool *value, const bool *address);
-    void write(const bool *value, const bool *address, const int times);
+    uint write(const bool *value);
+    uint write(const bool *value, const int times);
+    uint write(const bool *value, const bool *address);
+    uint write(const bool *value, const bool *address, const int times);
+
+    void print_state(uint cells_num = 10);
 };
 
 template<typename cell_type, typename index_type, typename summation_type>
-SDM_KANERVA<cell_type, index_type, summation_type>::SDM_KANERVA(uint d, uint L, uint M, uint N, uint block_count, uint threads_per_block)
+SDM_KANERVA<cell_type, index_type, summation_type>::SDM_KANERVA(uint d, uint L, uint M, uint N, uint block_count, uint threads_per_block, double p0)
 {
     this->d = d;
     this->L = L;
     this->M = M;
     this->N = N;
     this->d = d;
+    this->p0 = p0;
     this->block_count = block_count;
     this->threads_per_block = threads_per_block;
 
@@ -52,7 +56,7 @@ SDM_KANERVA<cell_type, index_type, summation_type>::SDM_KANERVA(uint d, uint L, 
     kernel_decorator(
             init_kanerva<cell_type>,
             block_count, threads_per_block, true,
-            cells, addresses, L, M, N, thread_count
+            cells, addresses, L, M, N, thread_count, this->p0
     );
 }
 
@@ -99,6 +103,23 @@ bool* SDM_KANERVA<cell_type, index_type, summation_type>::read(const bool* value
 
     cuda_memcpy_from_gpu(activation_counter, cuda_activation_counter, 1);
     int activated_cells_number = activation_counter[0];
+    //std::cout << activated_cells_number << std::endl;
+
+    if (activated_cells_number == 0)
+    {
+        bool* result = (bool*)malloc(M * sizeof(bool));
+        memset(result, 0, M * sizeof(bool));
+
+        free(activation_counter);
+
+        cuda_free(cuda_activation_counter);
+        cuda_free(cuda_address);
+        cuda_free(cuda_activation_indices);
+        cuda_free(cuda_sum);
+        cuda_free(cuda_value);
+
+        return result;
+    }
 
     kernel_decorator(
             read_jaeckel<cell_type, index_type, summation_type>,
@@ -132,7 +153,7 @@ bool* SDM_KANERVA<cell_type, index_type, summation_type>::read(const bool* value
 template<typename cell_type, typename index_type, typename summation_type>
 bool* SDM_KANERVA<cell_type, index_type, summation_type>::read(const bool* value)
 {
-    return this->read(value, 1);
+    return this->read(value, value);
 }
 
 template<typename cell_type, typename index_type, typename summation_type>
@@ -198,27 +219,26 @@ bool* SDM_KANERVA<cell_type, index_type, summation_type>::read(const bool* value
 }
 
 template<typename cell_type, typename index_type, typename summation_type>
-void SDM_KANERVA<cell_type, index_type, summation_type>::write(const bool *value)
+uint SDM_KANERVA<cell_type, index_type, summation_type>::write(const bool *value)
 {
-    this->write(value, 1);
+    return this->write(value, 1);
 }
 
 template<typename cell_type, typename index_type, typename summation_type>
-void SDM_KANERVA<cell_type, index_type, summation_type>::write(const bool *value, const int times)
+uint SDM_KANERVA<cell_type, index_type, summation_type>::write(const bool *value, const int times)
 {
-    this->write(value, value, times);
+    return this->write(value, value, times);
 }
 
 template<typename cell_type, typename index_type, typename summation_type>
-void SDM_KANERVA<cell_type, index_type, summation_type>::write(const bool *value, const bool *address)
+uint SDM_KANERVA<cell_type, index_type, summation_type>::write(const bool *value, const bool *address)
 {
-    this->write(value, address, 1);
+    return this->write(value, address, 1);
 }
 
 template<typename cell_type, typename index_type, typename summation_type>
-void SDM_KANERVA<cell_type, index_type, summation_type>::write(const bool *value, const bool *address, const int times)
+uint SDM_KANERVA<cell_type, index_type, summation_type>::write(const bool *value, const bool *address, const int times)
 {
-
     bool* cuda_value;
     cuda_malloc(&cuda_value, M);
     cuda_memcpy_to_gpu(cuda_value, value, M);
@@ -255,6 +275,18 @@ void SDM_KANERVA<cell_type, index_type, summation_type>::write(const bool *value
     cuda_memcpy_from_gpu(activation_counter, cuda_activation_counter, 1);
     int activated_cells_number = activation_counter[0];
 
+    if (activated_cells_number == 0)
+    {
+        free(activation_counter);
+
+        cuda_free(cuda_activation_counter);
+        cuda_free(cuda_activation_indices);
+        cuda_free(cuda_address);
+        cuda_free(cuda_to_add);
+        cuda_free(cuda_value);
+        return 0;
+    }
+
     kernel_decorator(
             write_jaeckel<cell_type, index_type>,
             block_count, threads_per_block, true,
@@ -268,7 +300,57 @@ void SDM_KANERVA<cell_type, index_type, summation_type>::write(const bool *value
     cuda_free(cuda_address);
     cuda_free(cuda_to_add);
     cuda_free(cuda_value);
+
+    return activated_cells_number;
 }
 
+template<typename cell_type, typename index_type, typename summation_type>
+void SDM_KANERVA<cell_type, index_type, summation_type>::print_state(uint cells_num)
+{
+    cell_type* cell = (cell_type*)malloc((M + 1) * sizeof(cell_type));
+    bool* address = (bool*)malloc(L * sizeof(bool));
 
+    cell_type* cuda_cell;
+    cuda_malloc(&cuda_cell, M + 1);
+
+    bool* cuda_address;
+    cuda_malloc(&cuda_address, L);
+
+    for (uint i = 0; i < cells_num; i++)
+    {
+        std::cout << "addr_" << i << ": ";
+        kernel_decorator(
+                copy_chunk<bool>,
+                block_count, threads_per_block, true,
+                addresses, cuda_address, i*L, L, thread_count
+        );
+        cuda_memcpy_from_gpu(address, cuda_address, L);
+
+        for (int l = 0; l < L; l++)
+        {
+            std::cout << address[l] << ",";
+        }
+        std::cout << std::endl;
+
+        std::cout << "cell_" << i << ": ";
+
+        kernel_decorator(
+                copy_chunk<cell_type>,
+                block_count, threads_per_block, true,
+                cells, cuda_cell, i*(M + 1), (M + 1), thread_count
+        );
+        cuda_memcpy_from_gpu(cell, cuda_cell, M + 1);
+        for (uint j = 0; j < M; j++)
+        {
+            std::cout << cell[j] << ",";
+        }
+        std::cout << " acts=" << cell[M];
+        std::cout << std::endl;
+    }
+    cuda_free(cuda_cell);
+    cuda_free(cuda_address);
+
+    free(cell);
+    free(address);
+}
 #endif // !sdm_kanerva_cuh

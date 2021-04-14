@@ -14,6 +14,7 @@
 
 #include "runners/cifar10_runner.cuh"
 #include "runners/cs1_runner.cuh"
+#include "runners/kanerva_runner.cuh"
 #include "runners/labels_runner.cuh"
 
 Runners::CIFAR10RunnerParameters* get_cifar10_parameters();

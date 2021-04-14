@@ -21,6 +21,15 @@
 #endif
 
 
+struct GPUException: public std::exception
+{
+    std::string message;
+    GPUException(std::string message) : message(message) {}
+    ~GPUException() throw () {}
+    const char* what() const throw() { return message.c_str(); }
+};
+
+
 #define GPUErrorCheck(ans, synchronize_device) { GPUError((ans), __FILE__, __LINE__, synchronize_device); }
 inline void GPUError(cudaError_t code, std::string file, int line, bool synchronize_device = true)
 {
@@ -30,7 +39,7 @@ inline void GPUError(cudaError_t code, std::string file, int line, bool synchron
     if (code != cudaSuccess)
     {
         fprintf(stderr,"GPU error: %s %s %d\n", cudaGetErrorString(code), file.data(), line);
-        throw std::exception(cudaGetErrorString(code));
+        throw GPUException(cudaGetErrorString(code));
     }
 }
 

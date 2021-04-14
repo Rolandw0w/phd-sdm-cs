@@ -79,11 +79,11 @@ namespace Runners
 				std::string input_path = images_path;
 				input_path.append(image_number);
 				input_path.append("_input.bmp");
-				save_image_bmp(_strdup(input_path.c_str()), 32, 32, data[i]);
+				save_image_bmp(strdup(input_path.c_str()), 32, 32, data[i]);
 				
 				std::string output_path = images_path;
 				output_path.append("_output.bmp");
-				save_image_bmp(_strdup(output_path.c_str()), 32, 32, remembered);
+				save_image_bmp(strdup(output_path.c_str()), 32, 32, remembered);
 			}
 			
 			free(remembered);

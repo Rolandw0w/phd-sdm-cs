@@ -66,6 +66,23 @@ Runners::LabelsRunnerParameters* get_labels_parameters(ReadingType reading_type,
     return labels_parameters;
 }
 
+Runners::KanervaRunnerParameters* get_kanerva_parameters()
+{
+    const uint image_count = 9000;
+    const uint image_read = 9000;
+    const uint block_count = 64;
+    const uint threads_per_block = 1024;
+    const uint max_dist = 1;
+    const uint address_length = 600;
+    const uint value_length = 600;
+    const uint cells_count = 3000*1000;
+    const double p0 = 0.95;
+    auto* labels_parameters = new Runners::KanervaRunnerParameters(image_count, image_read, block_count, threads_per_block,
+                                                                   max_dist, cells_count, address_length, value_length, p0);
+
+    return labels_parameters;
+}
+
 void print_report(report_map* report)
 {
     for (const auto& elem : *report)
@@ -113,7 +130,7 @@ void cifar10_naive()
         print_report(&naive_report);
     }
     std::ofstream naive;
-    naive.open(reports_root + "\\naive.txt");
+    naive.open(reports_root + "/naive.txt");
     save_report_vector_json(&reports, naive);
 
     naive.close();
@@ -145,7 +162,7 @@ void cifar10_multiple_write()
         print_report(&multiple_write_report);
     }
     std::ofstream multiple_write;
-    multiple_write.open(reports_root + "\\cifar10_multiple_write.txt");
+    multiple_write.open(reports_root + "/cifar10_multiple_write.txt");
     save_report_vector_json(&reports, multiple_write);
 
     multiple_write.close();
@@ -175,7 +192,7 @@ void cifar10_iterative_read()
         print_report(&iterative_read_report);
     }
     std::ofstream iterative_read;
-    iterative_read.open(reports_root + "\\iterative_read.txt");
+    iterative_read.open(reports_root + "/iterative_read.txt");
     save_report_vector_json(&reports, iterative_read);
 
     iterative_read.close();
@@ -204,7 +221,7 @@ void cifar10_noisy_address()
         print_report(&noisy_address_report);
     }
     std::ofstream noisy_address;
-    noisy_address.open(reports_root + "\\noisy_address.txt");
+    noisy_address.open(reports_root + "/noisy_address.txt");
     save_report_vector_json(&reports, noisy_address);
 
     noisy_address.close();
@@ -233,7 +250,7 @@ void cifar10_noisy_address_noisy_value()
         print_report(&noisy_address_report);
     }
     std::ofstream noisy_address_noisy_value;
-    noisy_address_noisy_value.open(reports_root + "\\noisy_address_noisy_value.txt");
+    noisy_address_noisy_value.open(reports_root + "/noisy_address_noisy_value.txt");
     save_report_vector_json(&reports, noisy_address_noisy_value);
 
     noisy_address_noisy_value.close();
@@ -266,7 +283,7 @@ void labels_stat_naive()
         print_report(&naive_report);
     }
     std::ofstream labels_stat_naive;
-    labels_stat_naive.open(reports_root + "\\labels_stat_naive.txt");
+    labels_stat_naive.open(reports_root + "/labels_stat_naive.txt");
     save_report_vector_json(&reports, labels_stat_naive);
 
     labels_stat_naive.close();
@@ -298,7 +315,7 @@ void labels_knots()
         print_report(&naive_report);
     }
     std::ofstream labels_stat_naive;
-    labels_stat_naive.open(reports_root + "\\labels_knots.txt");
+    labels_stat_naive.open(reports_root + "/labels_knots.txt");
     save_report_vector_json(&reports, labels_stat_naive);
 
     labels_stat_naive.close();
@@ -332,7 +349,7 @@ void labels_bio_naive()
     }
 
     std::ofstream labels_bio_naive;
-    labels_bio_naive.open(reports_root + "\\labels_bio_naive.txt");
+    labels_bio_naive.open(reports_root + "/labels_bio_naive.txt");
     save_report_vector_json(&reports, labels_bio_naive);
 
     labels_bio_naive.close();
@@ -375,7 +392,7 @@ void cs1_naive_grid1()
     }
 
     std::ofstream cs1_naive;
-    cs1_naive.open(reports_root + "\\cs1_naive_grid1.txt");
+    cs1_naive.open(reports_root + "/cs1_naive_grid1.txt");
     save_report_vector_json(&reports, cs1_naive);
 
     cs1_naive.close();
@@ -419,12 +436,59 @@ void cs1_naive_grid2()
     }
 
     std::ofstream cs1_naive;
-    cs1_naive.open(reports_root + "\\cs1_naive_grid2.txt");
+    cs1_naive.open(reports_root + "/cs1_naive_grid2.txt");
     save_report_vector_json(&reports, cs1_naive);
 
     cs1_naive.close();
     free(data);
     delete(cs1_parameters);
+}
+
+void kanerva_run()
+{
+    const int image_num = 9000;
+    const int labels_count = 600;
+
+    bool** data = get_labels(labels_count, image_num, data_root);
+
+    Runners::KanervaRunnerParameters* kanerva_parameters = get_kanerva_parameters();
+    uint max_dists[] = {9, 10, 11, 12};
+    uint image_counts[] = {500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500,
+                           5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000};
+    double p0s[] = {0.99, 0.995};
+
+    std::vector<report_map> reports;
+    for (auto p0: p0s)
+    {
+        for (auto max_dist: max_dists)
+        {
+            for (auto images_read: image_counts)
+            {
+                if (p0 == 0.99 && max_dist <= 6)
+                    continue;
+                Runners::KanervaRunner kanerva_runner{};
+
+                kanerva_parameters->images_read = images_read;
+                kanerva_parameters->max_dist = max_dist;
+                kanerva_parameters->p0 = p0;
+
+                kanerva_runner.set_parameters(kanerva_parameters);
+                kanerva_runner.set_data(&data);
+
+                report_map naive_report = kanerva_runner.naive(data_root, output_root);
+                reports.push_back(naive_report);
+                print_report(&naive_report);
+            }
+        }
+    }
+
+    std::ofstream cs1_naive;
+    cs1_naive.open(reports_root + "/kanerva_naive_grid2.txt");
+    save_report_vector_json(&reports, cs1_naive);
+
+    cs1_naive.close();
+    free(data);
+    delete(kanerva_parameters);
 }
 
 void cs1_image_count_grid()
@@ -458,7 +522,7 @@ void cs1_image_count_grid()
     }
 
     std::ofstream cs1_naive;
-    cs1_naive.open(reports_root + "\\cs1_naive_grid2.txt");
+    cs1_naive.open(reports_root + "/cs1_naive_grid2.txt");
     save_report_vector_json(&reports, cs1_naive);
 
     cs1_naive.close();
@@ -477,8 +541,8 @@ int main(int argc, char** argv)
     output_root = argv[3];
     std::string experiment_num = argv[4];
     int experiment_num_int = std::stoi(experiment_num);
-    if (experiment_num_int < 1 || experiment_num_int > 4)
-        throw std::invalid_argument("Only {1,2,3,4} experiments are available now");
+    if (experiment_num_int < 1 || experiment_num_int > 5)
+        throw std::invalid_argument("Only {1,2,3,4,5} experiments are available now");
 
     typedef std::pair < std::string, std::function<void(void)>> test_type;
     std::vector<test_type> tests;
@@ -510,6 +574,12 @@ int main(int argc, char** argv)
         //tests.emplace_back( "Plain test with matrix transformation (2)", cs1_naive_grid2 );
         tests.emplace_back( "Plain test with labels (knots)", labels_knots );
         tests.emplace_back( "Compressed sensing (image count grid)", cs1_image_count_grid );
+    }
+    if (experiment_num_int == 5)
+    {
+        //tests.emplace_back( "Plain test with matrix transformation (1)", cs1_naive_grid1 );
+        //tests.emplace_back( "Plain test with matrix transformation (2)", cs1_naive_grid2 );
+        tests.emplace_back( "Kanerva test", kanerva_run );
     }
 
     std::cout.precision(6);

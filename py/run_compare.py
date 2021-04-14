@@ -218,12 +218,12 @@ def main():
     parser.add_argument("--labels_mask_length", type=int,
                         help=labels_mask_length_help, default=default_labels_mask_length)
 
-    default_cs1_min_mask_length = 8
+    default_cs1_min_mask_length = None
     cs1_min_mask_length_help = f"Min mask length used for Compressed Sensing approach (default is {default_cs1_min_mask_length})"
     parser.add_argument("--cs1_min_mask_length", type=int,
                         help=cs1_min_mask_length_help, default=default_cs1_min_mask_length)
 
-    default_cs1_max_mask_length = 16
+    default_cs1_max_mask_length = None
     cs1_max_mask_length_help = f"Max mask length used for Compressed Sensing approach (default is {default_cs1_max_mask_length})"
     parser.add_argument("--cs1_max_mask_length", type=int,
                         help=cs1_max_mask_length_help, default=default_cs1_max_mask_length)

@@ -21,7 +21,7 @@ bool** get_cifar10_images(int image_num, std::string& data_root)
 	const int pixels = image_size / 3;
 	const int step = image_size + 1;
 
-	std::string full_path = data_root + "\\cifar10.bin";
+	std::string full_path = data_root + "/cifar10.bin";
 	const char* path = &full_path[0];
 
 	FILE* fp = fopen(path, "rb");
@@ -70,7 +70,7 @@ bool** get_labels(int labels_count, int image_num, std::string& data_root)
 
 	char* buffer = (char*)malloc(label_size_bytes * image_num * sizeof(char));
 
-    std::string full_path = data_root + "\\features.bin";
+    std::string full_path = data_root + "/features.bin";
     const char* path = &full_path[0];
 
 	FILE* fp = fopen(path, "rb");
@@ -106,7 +106,7 @@ bool* get_cs1(int labels_count, int image_num, std::string& data_root)
 
     char* buffer = (char*)malloc(label_size_bytes * image_num * sizeof(char));
 
-    std::string full_path = data_root + "\\features.bin";
+    std::string full_path = data_root + "/features.bin";
     const char* path = &full_path[0];
 
     FILE* fp = fopen(path, "rb");

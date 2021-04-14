@@ -11,7 +11,7 @@
 #include <memory>
 #include <time.h>
 #include <vector>
-#include <Windows.h>
+//#include <Windows.h>
 
 #include "functions.cuh"
 //#include "../utils/utils.hpp"
@@ -45,7 +45,7 @@ void init_jaeckel(cell_type* cells, index_type* indices, bool* bits, uint K, uin
 
 template<typename cell_type>
 __global__
-void init_kanerva(cell_type* cells, bool* addresses, uint L, uint M, uint N, int thread_count)
+void init_kanerva(cell_type* cells, bool* addresses, uint L, uint M, uint N, int thread_count, double p0 = 0.5)
 {
     int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
     curandState state;
@@ -60,7 +60,7 @@ void init_kanerva(cell_type* cells, bool* addresses, uint L, uint M, uint N, int
         for (uint j = 0; j < L; j++)
         {
             double rand = curand_uniform(&state);
-            addresses[i*L + j] = rand > 0.5;
+            addresses[i*L + j] = rand > p0;
         }
     }
 }

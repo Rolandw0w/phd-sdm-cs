@@ -9,7 +9,7 @@ def get_transformation(matrix_path) -> np.ndarray:
         return transformation_np
 
 
-def get_features(features_bin_path) -> np.ndarray:
+def get_features(features_bin_path, left_slice: int = None) -> np.ndarray:
     with open(features_bin_path, "rb") as f_read:
         content = f_read.read()
         ords = ["{0:b}".format(b) for b in content]
@@ -27,6 +27,9 @@ def get_features(features_bin_path) -> np.ndarray:
                 c = 0
 
         data_np = np.column_stack(d)
+
+        if left_slice:
+            return data_np[:, :left_slice]
         return data_np
 
 

@@ -40,7 +40,7 @@ report_map Runners::CS1Runner::naive(const std::string& data_path, const std::st
     uint transformation_size = rows*parameters->image_count;
 
     std::ofstream transformation_file;
-    auto transformation_file_path = output_path + "\\cs1_matrix_K_" + std::to_string(parameters->mask_length) +
+    auto transformation_file_path = output_path + "/cs1_matrix_K_" + std::to_string(parameters->mask_length) +
                                     "_I_" + std::to_string(parameters->images_read) + ".csv";
     transformation_file.open(transformation_file_path);
 
@@ -148,7 +148,7 @@ report_map Runners::CS1Runner::naive(const std::string& data_path, const std::st
 
     double sum_l1 = 0;
     long read_time_start = clock();
-    std::cout << "Started reading" << " ";
+    std::cout << "Started reading ";
     double sum_l1_arr = 0;
 
     double max_l1 = 0;
@@ -162,7 +162,7 @@ report_map Runners::CS1Runner::naive(const std::string& data_path, const std::st
     double avg_l1_c = 0;
     int read_zeros = 0;
     std::ofstream restored;
-    restored.open(output_path + "\\cs1_K_" + std::to_string(parameters->mask_length) +
+    restored.open(output_path + "/cs1_K_" + std::to_string(parameters->mask_length) +
                     "_I_" + std::to_string(parameters->images_read) + ".csv");
     for(int i = 0; i < parameters->images_read; i++)
     {

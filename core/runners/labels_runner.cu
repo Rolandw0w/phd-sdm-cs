@@ -60,7 +60,7 @@ namespace Runners
         std::ofstream restored;
 
         auto mode = parameters->reading_type == ReadingType::BIOLOGICAL ? "bio" : "stat";
-        restored.open(output_path + "\\labels_" + mode + "_K_" + std::to_string(parameters->mask_length) +
+        restored.open(output_path + "/labels_" + mode + "_K_" + std::to_string(parameters->mask_length) +
                       "_I_" + std::to_string(parameters->images_read) + ".csv");
 
         for (uint i = 0; i < parameters->images_read; i++)
