@@ -299,20 +299,25 @@ void labels_knots()
     bool** data = get_labels(labels_count, image_num, data_root);
 
     uint images_reads[] = {500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000};
+    uint mask_lengths[] = {1, 2, 3, 4, 5, 6};
     Runners::LabelsRunnerParameters* labels_parameters = get_labels_parameters(ReadingType::STATISTICAL);
 
     std::vector<report_map> reports;
-    for (uint images_read: images_reads)
+    for (uint mask_length: mask_lengths)
     {
-        Runners::LabelsRunner labels_runner{};
-        labels_parameters->images_read = images_read;
+        for (uint images_read: images_reads)
+        {
+            Runners::LabelsRunner labels_runner{};
+            labels_parameters->images_read = images_read;
+            labels_parameters->mask_length = mask_length;
 
-        labels_runner.set_parameters(labels_parameters);
-        labels_runner.set_data(&data);
+            labels_runner.set_parameters(labels_parameters);
+            labels_runner.set_data(&data);
 
-        report_map naive_report = labels_runner.naive(data_root, output_root);
-        reports.push_back(naive_report);
-        print_report(&naive_report);
+            report_map naive_report = labels_runner.naive(data_root, output_root);
+            reports.push_back(naive_report);
+            print_report(&naive_report);
+        }
     }
     std::ofstream labels_stat_naive;
     labels_stat_naive.open(reports_root + "/labels_knots.txt");
@@ -452,7 +457,7 @@ void kanerva_run()
     bool** data = get_labels(labels_count, image_num, data_root);
 
     Runners::KanervaRunnerParameters* kanerva_parameters = get_kanerva_parameters();
-    uint max_dists[] = {9, 10, 11, 12};
+    uint max_dists[] = {1, 2, 3, 4, 5, 6};
     uint image_counts[] = {500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500,
                            5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000};
     double p0s[] = {0.99, 0.995};
@@ -462,23 +467,20 @@ void kanerva_run()
     {
         for (auto max_dist: max_dists)
         {
-            for (auto images_read: image_counts)
-            {
-                if (p0 == 0.99 && max_dist <= 6)
-                    continue;
-                Runners::KanervaRunner kanerva_runner{};
+            if (p0 == 0.99 && max_dist <= 6)
+                continue;
+            Runners::KanervaRunner kanerva_runner{};
 
-                kanerva_parameters->images_read = images_read;
-                kanerva_parameters->max_dist = max_dist;
-                kanerva_parameters->p0 = p0;
+            // kanerva_parameters->images_read = images_read;
+            kanerva_parameters->max_dist = max_dist;
+            kanerva_parameters->p0 = p0;
 
-                kanerva_runner.set_parameters(kanerva_parameters);
-                kanerva_runner.set_data(&data);
+            kanerva_runner.set_parameters(kanerva_parameters);
+            kanerva_runner.set_data(&data);
 
-                report_map naive_report = kanerva_runner.naive(data_root, output_root);
-                reports.push_back(naive_report);
-                print_report(&naive_report);
-            }
+            report_map naive_report = kanerva_runner.naive(data_root, output_root);
+            reports.push_back(naive_report);
+            print_report(&naive_report);
         }
     }
 
@@ -541,8 +543,8 @@ int main(int argc, char** argv)
     output_root = argv[3];
     std::string experiment_num = argv[4];
     int experiment_num_int = std::stoi(experiment_num);
-    if (experiment_num_int < 1 || experiment_num_int > 5)
-        throw std::invalid_argument("Only {1,2,3,4,5} experiments are available now");
+    if (experiment_num_int < 1 || experiment_num_int > 6)
+        throw std::invalid_argument("Only {1,2,3,4,5,6} experiments are available now");
 
     typedef std::pair < std::string, std::function<void(void)>> test_type;
     std::vector<test_type> tests;
@@ -580,6 +582,10 @@ int main(int argc, char** argv)
         //tests.emplace_back( "Plain test with matrix transformation (1)", cs1_naive_grid1 );
         //tests.emplace_back( "Plain test with matrix transformation (2)", cs1_naive_grid2 );
         tests.emplace_back( "Kanerva test", kanerva_run );
+    }
+    if (experiment_num_int == 6)
+    {
+        tests.emplace_back( "Plain test with labels (knots)", labels_knots );
     }
 
     std::cout.precision(6);

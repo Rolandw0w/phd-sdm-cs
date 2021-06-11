@@ -11,69 +11,13 @@ sys.path.append(os.path.join(os.getcwd(), "..", ".."))
 from matplotlib import pyplot as plt
 import numpy as np
 
-from py import data_wrangling as dw
+from py import data_wrangling as dw, metrics, plots, signals
 from py.restore_signal import restore_cs1_signal
-from py.utils import calculate_l1
+from py.utils import calculate_l1, perf_measure
+
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s: %(message)s')
 logger = logging.getLogger("COMPARATIVE_EXPERIMENT")
-
-
-def get_labels_signals(input_path: str,
-                       labels_mask_length: int,
-                       image_nums: list) -> dict:
-    labels_signals_map = {}
-    for image_num in image_nums:
-        logger.info(f"Started reading labels signals: image_num={image_num}")
-        labels_path = os.path.join(input_path, f"labels_stat_K_{labels_mask_length}_I_{image_num}.csv")
-        if not os.path.isfile(labels_path):
-            msg = f"File {labels_path} not found"
-            raise ValueError(msg)
-
-        labels_signals = np.genfromtxt(labels_path, delimiter=",")
-        labels_signals_map[image_num] = labels_signals
-
-    return labels_signals_map
-
-
-def get_cs1_signals(input_path: str,
-                    features: np.array,
-                    cs1_mask_range: list,
-                    image_num: int,
-                    skip_indices: set) -> dict:
-    cs1_signal = {}
-    for mask_length in cs1_mask_range:
-        logger.info(f"Starting signal restoration: mask_length={mask_length}, image_num={image_num}")
-        cs1_path = os.path.join(input_path, f"cs1_K_{mask_length}_I_{image_num}.csv")
-        if not os.path.isfile(cs1_path):
-            msg = f"File {cs1_path} not found"
-            raise ValueError(msg)
-
-        cs1_matrix_path = os.path.join(input_path, f"cs1_matrix_K_{mask_length}_I_{image_num}.csv")
-        if not os.path.isfile(cs1_matrix_path):
-            msg = f"File {cs1_matrix_path} not found"
-            raise ValueError(msg)
-
-        cs1 = np.genfromtxt(cs1_path, delimiter=",")
-        cs1_matrix = np.genfromtxt(cs1_matrix_path, delimiter=",")
-
-        restored = []
-        for i in range(image_num):
-            if i in skip_indices:
-                restored.append(None)
-                continue
-
-            features_i = features[:, i]
-            features_i_non_zero = features_i.nonzero()
-
-            cs1_i = cs1[i]
-            cs1_restored_signal = restore_cs1_signal(features_i_non_zero, cs1_i, cs1_matrix)
-            restored.append(cs1_restored_signal)
-
-        cs1_signal[mask_length] = restored
-        logger.info(f"Finished signal restoration: mask_length={mask_length}, image_num={image_num}")
-
-    return cs1_signal
 
 
 def save_plots(plots_path: str,
@@ -170,34 +114,30 @@ def process(features_path: str,
             image_nums: list,
             plots_path: str,
             cs1_mask_range: list,
+            labels_mask_range: list,
             multi_process: bool = False):
     features = dw.get_features(features_path)
-    skip_indices = set()
-    for i in range(max(image_nums)):
-        f_i = features[:, i]
-        f_i_non_zero = f_i.nonzero()[0]
-        if len(f_i_non_zero) == 0:
-            skip_indices.add(i)
 
-    labels_signals_map = get_labels_signals(input_path, labels_mask_length, image_nums)
+    kanerva_radius_list = [1, 2, 3, 4, 5, 6]
+    kanerva_p0s = ["0.990", "0.995"]
+    kanerva_signals_map = signals.get_kanerva_signals_all(input_path, kanerva_radius_list, kanerva_p0s, image_nums)
 
-    def _process_cs1(img_num):
-        return get_cs1_signals(input_path, features, cs1_mask_range, image_num, skip_indices)
+    labels_signals_map = signals.get_labels_signals_all(input_path, labels_mask_range, image_nums)
 
-    cs1_signals_map = {}
-    if not multi_process:
-        for image_num in image_nums:
-            cs1_signals = _process_cs1(image_num)
-            cs1_signals_map[image_num] = cs1_signals
-    else:
-        process_num = len(image_nums)
-        with mp.Pool(process_num) as pool:
-            params = [(input_path, features, cs1_mask_range, img_num, skip_indices)
-                      for img_num in image_nums]
-            cs1_signals_list = pool.starmap(get_cs1_signals, params)
-            cs1_signals_map = dict(zip(image_nums, cs1_signals_list))
+    cs1_signals_map = signals.get_cs1_signals_all(input_path, cs1_mask_range, image_nums)
 
-    save_plots(plots_path, image_nums, features, labels_signals_map, cs1_signals_map, cs1_mask_range, skip_indices)
+    kanerva_metrics_map = metrics.get_kanerva_metrics_all(kanerva_signals_map, features, image_nums)
+    labels_metrics_map = metrics.get_labels_metrics_all(labels_signals_map, features, image_nums)
+    cs1_metrics_map = metrics.get_cs1_metrics_all(cs1_signals_map, features, image_nums)
+
+    plots.plot_kanerva(plots_path, kanerva_metrics_map, kanerva_radius_list, image_nums)
+    plots.plot_labels(plots_path, labels_metrics_map, labels_mask_range, image_nums)
+    plots.plot_cs1(plots_path, cs1_metrics_map, cs1_mask_range, image_nums)
+    plots.plot_comparison(plots_path, image_nums,
+                          kanerva_metrics_map, labels_metrics_map, cs1_metrics_map,
+                          1, 2, 14)
+    print()
+    # save_plots(plots_path, image_nums, features, labels_signals_map, cs1_signals_map, cs1_mask_range, skip_indices)
 
 
 def main():
@@ -218,17 +158,17 @@ def main():
     parser.add_argument("--labels_mask_length", type=int,
                         help=labels_mask_length_help, default=default_labels_mask_length)
 
-    default_cs1_min_mask_length = None
+    default_cs1_min_mask_length = 10
     cs1_min_mask_length_help = f"Min mask length used for Compressed Sensing approach (default is {default_cs1_min_mask_length})"
     parser.add_argument("--cs1_min_mask_length", type=int,
                         help=cs1_min_mask_length_help, default=default_cs1_min_mask_length)
 
-    default_cs1_max_mask_length = None
+    default_cs1_max_mask_length = 14
     cs1_max_mask_length_help = f"Max mask length used for Compressed Sensing approach (default is {default_cs1_max_mask_length})"
     parser.add_argument("--cs1_max_mask_length", type=int,
                         help=cs1_max_mask_length_help, default=default_cs1_max_mask_length)
 
-    default_cs1_opt_mask_length = 12
+    default_cs1_opt_mask_length = None
     cs1_opt_mask_length_help = f"Optimal mask length used for Compressed Sensing approach (default is {default_cs1_opt_mask_length})"
     parser.add_argument("--cs1_opt_mask_length", type=int,
                         help=cs1_opt_mask_length_help, default=default_cs1_opt_mask_length)
@@ -291,7 +231,9 @@ def main():
             image_nums,
             plots_path,
             cs1_mask_range=cs1_mask_range,
-            multi_process=multi_process)
+            labels_mask_range=[1, 2, 3, 4, 5],
+            multi_process=multi_process,
+            )
 
 
 if __name__ == "__main__":

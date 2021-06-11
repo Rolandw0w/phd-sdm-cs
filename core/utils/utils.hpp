@@ -1,9 +1,13 @@
 #ifndef utils_h
 #define utils_h
 
+#include <chrono>
 #include <cmath>
 #include <random>
 #include <stdexcept>
+
+
+long get_current_time_millis();
 
 
 typedef unsigned int uint;

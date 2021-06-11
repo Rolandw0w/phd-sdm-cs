@@ -7,6 +7,12 @@
 
 #include "utils.hpp"
 
+long get_current_time_millis()
+{
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
+            .count();
+}
+
 
 uint hamming_distance(bool* x, bool* y, uint dim)
 {

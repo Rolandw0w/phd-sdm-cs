@@ -1,8 +1,6 @@
 #ifndef kanerva_runner_cuh
 #define kanerva_runner_cuh
 
-#include <chrono>
-
 #include "base_runner.cuh"
 #include "../data_ops/data_writer.hpp"
 #include "../sdm/sdm_kanerva.cuh"
