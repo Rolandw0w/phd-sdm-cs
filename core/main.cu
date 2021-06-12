@@ -532,6 +532,88 @@ void cs1_image_count_grid()
     delete(cs1_parameters);
 }
 
+void cs1_noisy()
+{
+    const int image_num = 9000;
+    const int labels_count = 600;
+
+    bool* data = get_cs1(labels_count, image_num, data_root);
+
+    Runners::CS1RunnerParameters* cs1_parameters = get_cs1_parameters();
+    uint mask_lengths[] = {8, 9, 10, 11, 12, 13, 14, 15, 16};
+    uint image_counts[] = {500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000};
+//    uint mask_lengths[] = {15};
+//    uint image_counts[] = {500};
+
+    std::vector<report_map> reports;
+    for (auto mask_length: mask_lengths)
+    {
+        for (auto images_read: image_counts)
+        {
+            Runners::CS1Runner cs1_runner{};
+
+            cs1_parameters->images_read = images_read;
+            cs1_parameters->mask_length = mask_length;
+
+            cs1_runner.set_parameters(cs1_parameters);
+            cs1_runner.set_data(&data);
+
+            report_map naive_report = cs1_runner.noisy(data_root, output_root);
+            reports.push_back(naive_report);
+            print_report(&naive_report);
+        }
+    }
+
+    std::ofstream cs1_naive;
+    cs1_naive.open(reports_root + "/cs1_noisy_1_grid.txt");
+    save_report_vector_json(&reports, cs1_naive);
+
+    cs1_naive.close();
+    free(data);
+    delete(cs1_parameters);
+}
+
+void cs1_noisy_2()
+{
+    const int image_num = 9000;
+    const int labels_count = 600;
+
+    bool* data = get_cs1(labels_count, image_num, data_root);
+
+    Runners::CS1RunnerParameters* cs1_parameters = get_cs1_parameters();
+    uint mask_lengths[] = {8, 9, 10, 11, 12, 13, 14, 15, 16};
+    uint image_counts[] = {500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000};
+//    uint mask_lengths[] = {15};
+//    uint image_counts[] = {500};
+
+    std::vector<report_map> reports;
+    for (auto mask_length: mask_lengths)
+    {
+        for (auto images_read: image_counts)
+        {
+            Runners::CS1Runner cs1_runner{};
+
+            cs1_parameters->images_read = images_read;
+            cs1_parameters->mask_length = mask_length;
+
+            cs1_runner.set_parameters(cs1_parameters);
+            cs1_runner.set_data(&data);
+
+            report_map naive_report = cs1_runner.noisy_2(data_root, output_root);
+            reports.push_back(naive_report);
+            print_report(&naive_report);
+        }
+    }
+
+    std::ofstream cs1_naive;
+    cs1_naive.open(reports_root + "/cs1_noisy_2_grid.txt");
+    save_report_vector_json(&reports, cs1_naive);
+
+    cs1_naive.close();
+    free(data);
+    delete(cs1_parameters);
+}
+
 int main(int argc, char** argv)
 {
     if (argc == 0)
@@ -543,8 +625,8 @@ int main(int argc, char** argv)
     output_root = argv[3];
     std::string experiment_num = argv[4];
     int experiment_num_int = std::stoi(experiment_num);
-    if (experiment_num_int < 1 || experiment_num_int > 6)
-        throw std::invalid_argument("Only {1,2,3,4,5,6} experiments are available now");
+    if (experiment_num_int < 1 || experiment_num_int > 8)
+        throw std::invalid_argument("Only {1,2,3,4,5,6,7,8} experiments are available now");
 
     typedef std::pair < std::string, std::function<void(void)>> test_type;
     std::vector<test_type> tests;
@@ -586,6 +668,14 @@ int main(int argc, char** argv)
     if (experiment_num_int == 6)
     {
         tests.emplace_back( "Plain test with labels (knots)", labels_knots );
+    }
+    if (experiment_num_int == 7)
+    {
+        tests.emplace_back( "Noisy test for CS SDM", cs1_noisy );
+    }
+    if (experiment_num_int == 8)
+    {
+        tests.emplace_back( "Noisy test for CS SDM (2 bits)", cs1_noisy_2 );
     }
 
     std::cout.precision(6);

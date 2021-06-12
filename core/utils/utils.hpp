@@ -81,4 +81,30 @@ void out(T* array, int length, char sep)
         std::cout << array[i] << sep;
     }
 }
+
+template <typename T>
+T* noise_ones(const T* array, int length, int seed = 0)
+{
+    T* result = (T*) malloc(length * sizeof(T));
+
+    std::vector<int> one_indices;
+    for (int i = 0; i < length; i++)
+    {
+        T val = array[i];
+        if (val == 1)
+            one_indices.push_back(i);
+        result[i] = array[i];
+    }
+
+    std::random_device rd;
+    std::mt19937 generator(seed);
+    std::uniform_int_distribution<int> u_distribution(0, one_indices.size());
+
+    int swap_swap_index = u_distribution(generator);
+    int swap_index = one_indices[swap_swap_index];
+
+    result[swap_index] ^= 1;
+
+    return result;
+}
 #endif // !utils_h

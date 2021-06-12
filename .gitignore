@@ -2,5 +2,8 @@
 cmake-build-debug/
 cmake-build-release/
 output/
-reports/
+output_noisy/
+output_noisy_2/
+reports_noisy/
+reports_noisy_2/
 venv/

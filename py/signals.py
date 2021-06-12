@@ -93,11 +93,12 @@ def get_labels_signals_all(input_path: str,
 def get_cs1_signals(input_path: str,
                     cs1_mask_range: list,
                     image_num: int,
+                    mask: str = "",
                     ) -> dict:
     logger.info(f"Started reading CS1 signals: image_num={image_num}")
     cs1_signals = {}
     for mask_length in cs1_mask_range:
-        cs1_signal_path = os.path.join(input_path, f"cs1_signal_K_{mask_length}_I_{image_num}.csv")
+        cs1_signal_path = os.path.join(input_path, f"cs1_signal{mask}_K_{mask_length}_I_{image_num}.csv")
         if not os.path.isfile(cs1_signal_path):
             msg = f"File {cs1_signal_path} not found"
             raise ValueError(msg)
@@ -114,16 +115,17 @@ def get_cs1_signals_all(input_path: str,
                         cs1_mask_range: list,
                         image_nums: list,
                         processes: int = -1,
+                        mask: str = "",
                         ):
     cs1_signals_map = {}
     if processes is None:
         for image_num in image_nums:
-            cs1_signals = get_cs1_signals(input_path, cs1_mask_range, image_num)
+            cs1_signals = get_cs1_signals(input_path, cs1_mask_range, image_num, mask=mask)
             cs1_signals_map[image_num] = cs1_signals
     else:
         process_num = len(image_nums) if processes == -1 else processes
         with mp.Pool(process_num) as pool:
-            params = [(input_path, cs1_mask_range, image_num) for image_num in image_nums]
+            params = [(input_path, cs1_mask_range, image_num, mask) for image_num in image_nums]
             cs1_signals_list = pool.starmap(get_cs1_signals, params)
             cs1_signals_map = dict(zip(image_nums, cs1_signals_list))
 
@@ -136,16 +138,17 @@ def calculate_cs1_signals(input_path: str,
                           image_num: int,
                           skip_indices: set,
                           write_to_disk: bool = True,
+                          mask: str = ""
                           ) -> dict:
     cs1_signal = {}
     for mask_length in cs1_mask_range:
         logger.info(f"Starting signal restoration: mask_length={mask_length}, image_num={image_num}")
-        cs1_path = os.path.join(input_path, f"cs1_K_{mask_length}_I_{image_num}.csv")
+        cs1_path = os.path.join(input_path, f"cs1{mask}_K_{mask_length}_I_{image_num}.csv")
         if not os.path.isfile(cs1_path):
             msg = f"File {cs1_path} not found"
             raise ValueError(msg)
 
-        cs1_matrix_path = os.path.join(input_path, f"cs1_matrix_K_{mask_length}_I_{image_num}.csv")
+        cs1_matrix_path = os.path.join(input_path, f"cs1{mask}_matrix_K_{mask_length}_I_{image_num}.csv")
         if not os.path.isfile(cs1_matrix_path):
             msg = f"File {cs1_matrix_path} not found"
             raise ValueError(msg)
@@ -163,11 +166,16 @@ def calculate_cs1_signals(input_path: str,
             features_i_non_zero = features_i.nonzero()
 
             cs1_i = cs1[i]
+
+            if len(cs1_i.nonzero()[0]) == 0:
+                restored.append(np.zeros((600,)))
+                continue
+
             cs1_restored_signal = restore_cs1_signal(features_i_non_zero, cs1_i, cs1_matrix)
             restored.append(cs1_restored_signal)
 
         if write_to_disk:
-            cs1_signal_path = os.path.join(input_path, f"cs1_signal_K_{mask_length}_I_{image_num}.csv")
+            cs1_signal_path = os.path.join(input_path, f"cs1_signal{mask}_K_{mask_length}_I_{image_num}.csv")
             rows = []
             for row in restored:
                 try:
@@ -183,3 +191,29 @@ def calculate_cs1_signals(input_path: str,
         logger.info(f"Finished signal restoration: mask_length={mask_length}, image_num={image_num}")
 
     return cs1_signal
+
+
+def calculate_cs1_signals_all(input_path: str,
+                              features: np.array,
+                              cs1_mask_range: list,
+                              image_nums: list,
+                              skip_indices: set,
+                              write_to_disk: bool = True,
+                              mask: str = "cs1_signal",
+                              processes: int = -1,
+                              ) -> dict:
+    cs1_signals_map = {}
+    if processes is None:
+        for image_num in image_nums:
+            cs1_signals = calculate_cs1_signals(input_path, features, cs1_mask_range, image_num, skip_indices,
+                                                write_to_disk=write_to_disk, mask=mask)
+            cs1_signals_map[image_num] = cs1_signals
+    else:
+        process_num = len(image_nums) if processes == -1 else processes
+        with mp.Pool(process_num) as pool:
+            params = [(input_path, features, cs1_mask_range, image_num, skip_indices, write_to_disk, mask)
+                      for image_num in image_nums]
+            cs1_signals_list = pool.starmap(calculate_cs1_signals, params)
+            cs1_signals_map = dict(zip(image_nums, cs1_signals_list))
+
+    return cs1_signals_map

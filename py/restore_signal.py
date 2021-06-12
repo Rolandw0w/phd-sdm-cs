@@ -11,7 +11,7 @@ def restore_cs1_signal(non_zero_features, sdm_signal, transformation, error_hand
 
         set_sdm_signal = set(sdm_signal)
         if set_sdm_signal == {0}:
-            cs1_signal = [0]*transformation.shape[1]
+            cs1_signal = np.zeros((transformation.shape[1],))
         else:
             omp = OrthogonalMatchingPursuit(n_nonzero_coefs=len_non_zero_features)
             omp.fit(transformation, sdm_signal)
@@ -24,3 +24,5 @@ def restore_cs1_signal(non_zero_features, sdm_signal, transformation, error_hand
             error_handler(error)
         else:
             print(error)
+
+        return np.zeros((transformation.shape[1],))

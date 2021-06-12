@@ -117,25 +117,47 @@ def process(features_path: str,
             labels_mask_range: list,
             multi_process: bool = False):
     features = dw.get_features(features_path)
+    skip_indices = set()
+    for index in range(features.shape[1]):
+        feature_array = features[:, index]
+        m = feature_array.max()
+        if m == 0:
+            skip_indices.add(index)
 
     kanerva_radius_list = [1, 2, 3, 4, 5, 6]
     kanerva_p0s = ["0.990", "0.995"]
-    kanerva_signals_map = signals.get_kanerva_signals_all(input_path, kanerva_radius_list, kanerva_p0s, image_nums)
+    # kanerva_signals_map = signals.get_kanerva_signals_all(input_path, kanerva_radius_list, kanerva_p0s, image_nums)
 
-    labels_signals_map = signals.get_labels_signals_all(input_path, labels_mask_range, image_nums)
+    # labels_signals_map = signals.get_labels_signals_all(input_path, labels_mask_range, image_nums)
 
-    cs1_signals_map = signals.get_cs1_signals_all(input_path, cs1_mask_range, image_nums)
+    # cs1_signals_map = signals.get_cs1_signals_all(input_path, cs1_mask_range, image_nums)
 
-    kanerva_metrics_map = metrics.get_kanerva_metrics_all(kanerva_signals_map, features, image_nums)
-    labels_metrics_map = metrics.get_labels_metrics_all(labels_signals_map, features, image_nums)
-    cs1_metrics_map = metrics.get_cs1_metrics_all(cs1_signals_map, features, image_nums)
+    # cs1_signals_noisy_1_map = signals.calculate_cs1_signals_all(os.path.abspath(os.path.join(os.getcwd(), "..", "output_noisy")),
+    #                                                             features, cs1_mask_range, image_nums, skip_indices,
+    #                                                             write_to_disk=True, mask="_noisy")
+    cs1_signals_noisy_2_map = signals.calculate_cs1_signals_all(os.path.abspath(os.path.join(os.getcwd(), "..", "output_noisy_2")),
+                                                                features, cs1_mask_range, image_nums, skip_indices,
+                                                                write_to_disk=True, mask="_noisy_2")
 
-    plots.plot_kanerva(plots_path, kanerva_metrics_map, kanerva_radius_list, image_nums)
-    plots.plot_labels(plots_path, labels_metrics_map, labels_mask_range, image_nums)
-    plots.plot_cs1(plots_path, cs1_metrics_map, cs1_mask_range, image_nums)
-    plots.plot_comparison(plots_path, image_nums,
-                          kanerva_metrics_map, labels_metrics_map, cs1_metrics_map,
-                          1, 2, 14)
+    # cs1_signals_noisy_1_map = signals.get_cs1_signals_all(os.path.abspath(os.path.join(os.getcwd(), "..", "output_noisy")),
+    #                                                       cs1_mask_range, image_nums, mask="_noisy")
+    # cs1_signals_noisy_2_map = signals.get_cs1_signals_all(os.path.abspath(os.path.join(os.getcwd(), "..", "output_noisy_2")),
+    #                                                       cs1_mask_range, image_nums, mask="_noisy_2")
+
+    # kanerva_metrics_map = metrics.get_kanerva_metrics_all(kanerva_signals_map, features, image_nums)
+    # labels_metrics_map = metrics.get_labels_metrics_all(labels_signals_map, features, image_nums)
+    # cs1_metrics_map = metrics.get_cs1_metrics_all(cs1_signals_map, features, image_nums)
+    # cs1_metrics_noisy_1_map = metrics.get_cs1_metrics_all(cs1_signals_noisy_1_map, features, image_nums)
+    cs1_metrics_noisy_2_map = metrics.get_cs1_metrics_all(cs1_signals_noisy_2_map, features, image_nums)
+
+    # plots.plot_kanerva(plots_path, kanerva_metrics_map, kanerva_radius_list, image_nums)
+    # plots.plot_labels(plots_path, labels_metrics_map, labels_mask_range, image_nums)
+    # plots.plot_cs1(plots_path, cs1_metrics_map, cs1_mask_range, image_nums)
+    # plots.plot_cs1_noisy_1(plots_path, cs1_metrics_noisy_1_map, cs1_mask_range, image_nums)
+    plots.plot_cs1_noisy_2(plots_path, cs1_metrics_noisy_2_map, cs1_mask_range, image_nums)
+    # plots.plot_comparison(plots_path, image_nums,
+    #                       kanerva_metrics_map, labels_metrics_map, cs1_metrics_map,
+    #                       1, 2, 14)
     print()
     # save_plots(plots_path, image_nums, features, labels_signals_map, cs1_signals_map, cs1_mask_range, skip_indices)
 
@@ -158,12 +180,12 @@ def main():
     parser.add_argument("--labels_mask_length", type=int,
                         help=labels_mask_length_help, default=default_labels_mask_length)
 
-    default_cs1_min_mask_length = 10
+    default_cs1_min_mask_length = 8
     cs1_min_mask_length_help = f"Min mask length used for Compressed Sensing approach (default is {default_cs1_min_mask_length})"
     parser.add_argument("--cs1_min_mask_length", type=int,
                         help=cs1_min_mask_length_help, default=default_cs1_min_mask_length)
 
-    default_cs1_max_mask_length = 14
+    default_cs1_max_mask_length = 16
     cs1_max_mask_length_help = f"Max mask length used for Compressed Sensing approach (default is {default_cs1_max_mask_length})"
     parser.add_argument("--cs1_max_mask_length", type=int,
                         help=cs1_max_mask_length_help, default=default_cs1_max_mask_length)

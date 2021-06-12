@@ -114,6 +114,76 @@ def plot_cs1(plots_path: str, cs1_metrics_map: dict, cs1_mask_range: list, image
         logger.info(f"Image {plot_path} was saved")
 
 
+def plot_cs1_noisy_1(plots_path: str, cs1_metrics_map: dict, cs1_mask_range: list, image_nums: list):
+    configs = [
+        ("avg_l1", "Average L1", "CS1 noisy signal reconstruction 1 bit (avg L1)",
+         f"cs1_average_l1_noisy_1", np.arange(0, 3.01, 0.5)),
+        ("fn_avg", "Average False Negative", "CS1 noisy signal reconstruction 1 bit (avg FN)",
+         f"cs1_average_false_negative_noisy_1", np.arange(0, 2.01, 0.25)),
+        ("fp_avg", "Average False Positive", "CS1 noisy signal reconstruction 1 bit (avg FP)",
+         f"cs1_average_false_positive_noisy_1", np.arange(0, 2.01, 0.25)),
+    ]
+    for key, y_label, title, image_name, y_ticks in configs:
+
+        x = image_nums
+        x_ticks = x
+        x_tick_labels = [str(k) for k in x_ticks]
+
+        y_tick_labels = [str(k) if isinstance(k, int) else ('%.2f' % k) for k in y_ticks]
+        plt.xticks(x_ticks, fontsize=6, labels=x_tick_labels)
+        plt.yticks(y_ticks, labels=y_tick_labels)
+        markers = [f"${mask_length}$" for mask_length in cs1_mask_range]
+        for index, mask_length in enumerate(cs1_mask_range):
+            ys = np.array([cs1_metrics_map[key][image_num][mask_length] for image_num in image_nums])
+
+            plt.plot(x, ys, marker=markers[index], color="k")
+
+        plt.legend([f"mask_length={mask_length}" for mask_length in cs1_mask_range], fontsize=6)
+        # plt.xlabel("Number of images restored")
+        # plt.ylabel(y_label)
+        # plt.title(title)
+
+        plot_path = os.path.abspath(os.path.join(plots_path, f"{image_name}.png"))
+        plt.savefig(plot_path)
+        plt.close()
+        logger.info(f"Image {plot_path} was saved")
+
+
+def plot_cs1_noisy_2(plots_path: str, cs1_metrics_map: dict, cs1_mask_range: list, image_nums: list):
+    configs = [
+        ("avg_l1", "Average L1", "CS1 noisy signal reconstruction 2 bit (avg L1)",
+         f"cs1_average_l1_noisy_2", np.arange(0, 3.01, 0.5)),
+        ("fn_avg", "Average False Negative", "CS1 noisy signal reconstruction 2 bit (avg FN)",
+         f"cs1_average_false_negative_noisy_2", np.arange(0, 2.01, 0.25)),
+        ("fp_avg", "Average False Positive", "CS1 noisy signal reconstruction 2 bit (avg FP)",
+         f"cs1_average_false_positive_noisy_2", np.arange(0, 2.01, 0.25)),
+    ]
+    for key, y_label, title, image_name, y_ticks in configs:
+
+        x = image_nums
+        x_ticks = x
+        x_tick_labels = [str(k) for k in x_ticks]
+
+        y_tick_labels = [str(k) if isinstance(k, int) else ('%.2f' % k) for k in y_ticks]
+        plt.xticks(x_ticks, fontsize=6, labels=x_tick_labels)
+        plt.yticks(y_ticks, labels=y_tick_labels)
+        markers = [f"${mask_length}$" for mask_length in cs1_mask_range]
+        for index, mask_length in enumerate(cs1_mask_range):
+            ys = np.array([cs1_metrics_map[key][image_num][mask_length] for image_num in image_nums])
+
+            plt.plot(x, ys, marker=markers[index], color="k")
+
+        plt.legend([f"mask_length={mask_length}" for mask_length in cs1_mask_range], fontsize=6)
+        # plt.xlabel("Number of images restored")
+        # plt.ylabel(y_label)
+        # plt.title(title)
+
+        plot_path = os.path.abspath(os.path.join(plots_path, f"{image_name}.png"))
+        plt.savefig(plot_path)
+        plt.close()
+        logger.info(f"Image {plot_path} was saved")
+
+
 def plot_comparison(plots_path: str, image_nums: list,
                     kanerva_metrics_map: dict, labels_metrics_map: dict, cs1_metrics_map: dict,
                     opt_kanerva_radius: int, opt_labels_mask_length: int, opt_cs1_mask_length: int,

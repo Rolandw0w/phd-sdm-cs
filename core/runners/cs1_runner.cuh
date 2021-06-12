@@ -44,6 +44,8 @@ namespace Runners
     {
     public:
         report_map naive(const std::string& data_path, const std::string& output_path);
+        report_map noisy(const std::string& data_path, const std::string& output_path);
+        report_map noisy_2(const std::string& data_path, const std::string& output_path);
 
         void set_data(bool** d) { this->data = *d; }
 

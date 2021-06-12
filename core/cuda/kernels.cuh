@@ -321,9 +321,10 @@ void get_acts_sum(cell_type* cells, int* activated_indices, uint M, int* activat
 
     for (int i = thread_num; i  < activated_cells_number; i += thread_count)
     {
-        ulong activated_index = activated_indices[i];
-        ulong cell_index = activated_index * (M + 1) + M;
+        long long activated_index = activated_indices[i];
+        long long cell_index = activated_index * (M + 1) + M;
         cell_type m = cells[cell_index];
+        //printf("\n%lld %lld %lld %d %d,", activated_index, c, cell_index, m, sum_act[0]);
         atomicAdd(&sum_act[0], m);
     }
 }
@@ -352,7 +353,8 @@ void read_cs1(cell_type* cells, int* activated_indices, uint M, int thread_count
     {
         for (int j = 0; j < M; j++)
         {
-            sum[j] /= sum_act[0];
+            sum[j] = (abs(sum_act[0]) > 1e-6) ? sum[j] / sum_act[0] : 0.0;
+            //printf("%d %d %f %f,", activation_counter[0], j, sum[j], sum_act[0]);
         }
     }
 }
