@@ -1,3 +1,4 @@
+import json
 import logging
 import multiprocessing as mp
 
@@ -19,7 +20,7 @@ def get_kanerva_metrics(kanerva_signals_map: dict, features: np.array, image_num
             l1s = []
             fns = []
             fps = []
-            for i in range(image_num):
+            for i in range(signals.shape[0]):
                 features_i = features[:, i]
                 signal_i = signals[i]
 
@@ -86,7 +87,7 @@ def get_labels_metrics(masks_signals: dict, features: np.array, image_num: int):
         l1s = []
         fns = []
         fps = []
-        for i in range(image_num):
+        for i in range(signals.shape[0]):
             features_i = features[:, i]
             signal_i = signals[i]
 
@@ -150,6 +151,40 @@ def get_cs1_metrics(masks_signals: dict, features: np.array, image_num: int):
         l1s = []
         fns = []
         fps = []
+        for i in range(signals.shape[0]):
+            features_i = features[:, i]
+            signal_i = signals[i]
+
+            l1 = calculate_l1(features_i, signal_i)
+            l1s.append(l1)
+
+            fn, fp, tn, tp = perf_measure(features_i, signal_i)
+            fns.append(fn)
+            fps.append(fp)
+
+        l1s_avg_map.setdefault(mask_length, {})
+        l1s_avg_map[mask_length] = np.mean(l1s)
+
+        fn_avg_map.setdefault(mask_length, {})
+        fn_avg_map[mask_length] = np.mean(fns)
+
+        fp_avg_map.setdefault(mask_length, {})
+        fp_avg_map[mask_length] = np.mean(fps)
+
+    logger.info(f"Finished calculating CS1 metrics: image_num={image_num}")
+
+    return l1s_avg_map, fn_avg_map, fp_avg_map
+
+
+def get_cs1_metrics_noisy(masks_signals: dict, features: np.array, image_num: int):
+    l1s_avg_map = {}
+    fn_avg_map = {}
+    fp_avg_map = {}
+    logger.info(f"Started calculating CS1 metrics: image_num={image_num}")
+    for mask_length, signals in masks_signals.items():
+        l1s = []
+        fns = []
+        fps = []
         for i in range(image_num):
             features_i = features[:, i]
             signal_i = signals[i]
@@ -182,7 +217,7 @@ def get_cs1_metrics_all(masks_signals: dict, features: np.ndarray, image_nums: l
 
     if processes is None:
         for image_num, map1 in masks_signals.items():
-            l1s_avg, fn_avg, fp_avg = get_labels_metrics(map1, features, image_num)
+            l1s_avg, fn_avg, fp_avg = get_cs1_metrics(map1, features, image_num)
             l1s_avg_map[image_num] = l1s_avg
             fn_avg_map[image_num] = fn_avg
             fp_avg_map[image_num] = fp_avg
@@ -204,3 +239,35 @@ def get_cs1_metrics_all(masks_signals: dict, features: np.ndarray, image_nums: l
         "fp_avg": fp_avg_map,
     }
     return metrics_map
+
+
+def save_metrics(metrics: dict, path: str) -> None:
+    with open(path, "w") as f:
+        metrics_json = json.dumps(metrics, indent=4)
+        f.write(metrics_json)
+        logger.info(f"Saved metrics to {path}")
+
+
+def read_metrics(path: str) -> dict:
+    with open(path, "r") as f:
+        content = f.read()
+        metrics = json.loads(content)
+
+        def _adjust_keys(d: dict):
+            res = {}
+            for k, v in d.items():
+                vv = _adjust_keys(v) if isinstance(v, dict) else v
+                for index, t_ in enumerate([int]):
+                    try:
+                        casted = t_(k)
+                    except:
+                        if index == 0:
+                            res[k] = vv
+                    else:
+                        res[casted] = vv
+            return res
+
+        metrics_adjusted = _adjust_keys(metrics)
+
+        logger.info(f"Read metrics from {path}")
+        return metrics_adjusted

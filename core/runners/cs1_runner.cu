@@ -316,8 +316,8 @@ report_map Runners::CS1Runner::noisy(const std::string& data_path, const std::st
 
     // get noisy data
     bool* data_noisy = (bool*) malloc(columns*parameters->image_count * sizeof(bool));
+    std::vector<int> less_than_3_indices;
     std::vector<int> one_indices;
-    int less_than_2_ones = 0;
     for (int i = 0; i < parameters->image_count; i++)
     {
         bool* img = (bool*) malloc(columns * sizeof(bool));
@@ -331,13 +331,14 @@ report_map Runners::CS1Runner::noisy(const std::string& data_path, const std::st
         }
         if (one_indices.size() <= 2)
         {
-            less_than_2_ones += 1;
             for(int j = 0; j < columns; j++)
             {
                 int ind = i*columns + j;
                 data_noisy[ind] = img[j];
             }
             free(img);
+            less_than_3_indices.push_back(i);
+            one_indices.clear();
             continue;
         }
         //std::random_device rd;
@@ -357,7 +358,7 @@ report_map Runners::CS1Runner::noisy(const std::string& data_path, const std::st
         free(img);
         one_indices.clear();
     }
-    std::cout << "less_than_2_ones=" << less_than_2_ones << std::endl;
+    std::cout << "less_than_3=" << less_than_3_indices.size() << std::endl;
 //    for (int i = 0; i < 600; i++)
 //    {
 //        std::cout << data[i];
@@ -444,6 +445,8 @@ report_map Runners::CS1Runner::noisy(const std::string& data_path, const std::st
     std::vector<int> acts(parameters->image_count);
     for(int i = 0; i < parameters->images_read; i++)
     {
+        if(std::find(less_than_3_indices.begin(), less_than_3_indices.end(), i) != less_than_3_indices.end())
+            continue;
         short* image = images[i];
         int act = sdm.write(image);
         act_zero += (act == 0);
@@ -476,6 +479,8 @@ report_map Runners::CS1Runner::noisy(const std::string& data_path, const std::st
 
     for(int i = 0; i < parameters->images_read; i++)
     {
+        if(std::find(less_than_3_indices.begin(), less_than_3_indices.end(), i) != less_than_3_indices.end())
+            continue;
         auto el = images[i];
         auto el_noisy = images_noisy[i];
         double l1_arr = 0;
@@ -568,6 +573,7 @@ report_map Runners::CS1Runner::noisy(const std::string& data_path, const std::st
     report.insert({"avg_read_time", (double)read_time / parameters->images_read});
     report.insert({"avg_write_time", (double)write_time / parameters->images_read});
     report.insert({"read_zeros", read_zeros});
+    report.insert({"less_than_3", less_than_3_indices.size()});
 //    report.insert({"min_activations", sdm.get_min_activations()});
 //    report.insert({"max_activations", sdm.get_max_activations()});
 //    report.insert({"activated_cells_count", sdm.get_activations_num()});
@@ -652,8 +658,8 @@ report_map Runners::CS1Runner::noisy_2(const std::string& data_path, const std::
 
     // get noisy data
     bool* data_noisy = (bool*) malloc(columns*parameters->image_count * sizeof(bool));
+    std::vector<int> less_than_3_indices;
     std::vector<int> one_indices;
-    int less_than_2_ones = 0;
     for (int i = 0; i < parameters->image_count; i++)
     {
         bool* img = (bool*) malloc(columns * sizeof(bool));
@@ -667,13 +673,14 @@ report_map Runners::CS1Runner::noisy_2(const std::string& data_path, const std::
         }
         if (one_indices.size() <= 2)
         {
-            less_than_2_ones += 1;
             for(int j = 0; j < columns; j++)
             {
                 int ind = i*columns + j;
                 data_noisy[ind] = img[j];
             }
             free(img);
+            less_than_3_indices.push_back(i);
+            one_indices.clear();
             continue;
         }
         //std::random_device rd;
@@ -701,7 +708,7 @@ report_map Runners::CS1Runner::noisy_2(const std::string& data_path, const std::
         free(img);
         one_indices.clear();
     }
-    std::cout << "less_than_2_ones=" << less_than_2_ones << std::endl;
+    std::cout << "less_than_3=" << less_than_3_indices.size() << std::endl;
 //    for (int i = 0; i < 600; i++)
 //    {
 //        std::cout << data[i];
@@ -788,6 +795,8 @@ report_map Runners::CS1Runner::noisy_2(const std::string& data_path, const std::
     std::vector<int> acts(parameters->image_count);
     for(int i = 0; i < parameters->images_read; i++)
     {
+        if(std::find(less_than_3_indices.begin(), less_than_3_indices.end(), i) != less_than_3_indices.end())
+            continue;
         short* image = images[i];
         int act = sdm.write(image);
         act_zero += (act == 0);
@@ -820,6 +829,8 @@ report_map Runners::CS1Runner::noisy_2(const std::string& data_path, const std::
 
     for(int i = 0; i < parameters->images_read; i++)
     {
+        if(std::find(less_than_3_indices.begin(), less_than_3_indices.end(), i) != less_than_3_indices.end())
+            continue;
         auto el = images[i];
         auto el_noisy = images_noisy[i];
         double l1_arr = 0;
@@ -912,7 +923,7 @@ report_map Runners::CS1Runner::noisy_2(const std::string& data_path, const std::
     report.insert({"avg_read_time", (double)read_time / parameters->images_read});
     report.insert({"avg_write_time", (double)write_time / parameters->images_read});
     report.insert({"read_zeros", read_zeros});
-    report.insert({"less_than_2_ones", less_than_2_ones});
+    report.insert({"less_than_3", less_than_3_indices.size()});
 //    report.insert({"min_activations", sdm.get_min_activations()});
 //    report.insert({"max_activations", sdm.get_max_activations()});
 //    report.insert({"activated_cells_count", sdm.get_activations_num()});

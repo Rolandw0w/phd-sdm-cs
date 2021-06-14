@@ -1,6 +1,7 @@
 .idea/
 cmake-build-debug/
 cmake-build-release/
+metrics/
 output/
 output_noisy/
 output_noisy_2/

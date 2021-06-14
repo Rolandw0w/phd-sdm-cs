@@ -14,7 +14,9 @@ logger = logging.getLogger("SIGNALS_READER")
 def get_kanerva_signals(input_path: str,
                         radius_list: list,
                         p0s: list,
-                        image_num: int) -> dict:
+                        image_num: int,
+                        delete_list: list = None,
+                        ) -> dict:
     logger.info(f"Starting reading Kanerva signals: image_num={image_num}")
     signals_map = {}
     for radius in radius_list:
@@ -23,6 +25,9 @@ def get_kanerva_signals(input_path: str,
             file_path = os.path.join(input_path, file_name)
 
             signals = np.genfromtxt(file_path, delimiter=",")
+            if isinstance(delete_list, list):
+                delete_indices = [x for x in delete_list if x < image_num]
+                signals = np.delete(signals, delete_indices, axis=0)
             signals_map.setdefault(p0, {})
             signals_map[p0][radius] = signals
 
@@ -35,16 +40,17 @@ def get_kanerva_signals_all(input_path: str,
                             p0s: list,
                             image_nums: list,
                             processes: int = -1,
+                            delete_list: list = None,
                             ) -> dict:
     kanerva_signals_map = {}
     if processes is None:
         for image_num in image_nums:
-            kanerva_signals = get_kanerva_signals(input_path, radius_list, p0s, image_num)
+            kanerva_signals = get_kanerva_signals(input_path, radius_list, p0s, image_num, delete_list=delete_list)
             kanerva_signals_map[image_num] = kanerva_signals
     else:
         process_num = len(image_nums) if processes == -1 else processes
         with mp.Pool(process_num) as pool:
-            params = [(input_path, radius_list, p0s, img_num) for img_num in image_nums]
+            params = [(input_path, radius_list, p0s, img_num, delete_list) for img_num in image_nums]
             kanerva_signals_list = pool.starmap(get_kanerva_signals, params)
             kanerva_signals_map = dict(zip(image_nums, kanerva_signals_list))
 
@@ -54,6 +60,7 @@ def get_kanerva_signals_all(input_path: str,
 def get_labels_signals(input_path: str,
                        labels_mask_range: list,
                        image_num: int,
+                       delete_list: list = None,
                        ) -> dict:
     logger.info(f"Started reading Labels signals: image_num={image_num}")
     labels_signals = {}
@@ -64,6 +71,9 @@ def get_labels_signals(input_path: str,
             raise ValueError(msg)
 
         labels_signal = np.genfromtxt(labels_path, delimiter=",")
+        if isinstance(delete_list, list):
+            delete_indices = [x for x in delete_list if x < image_num]
+            labels_signal = np.delete(labels_signal, delete_indices, axis=0)
         labels_signals[mask_length] = labels_signal
 
     logger.info(f"Finished reading Labels signals: image_num={image_num}")
@@ -74,16 +84,17 @@ def get_labels_signals_all(input_path: str,
                            labels_mask_range: list,
                            image_nums: list,
                            processes: int = -1,
+                           delete_list: list = None,
                            ) -> dict:
     labels_signals_map = {}
     if processes is None:
         for image_num in image_nums:
-            labels_signals = get_labels_signals(input_path, labels_mask_range, image_num)
+            labels_signals = get_labels_signals(input_path, labels_mask_range, image_num, delete_list=delete_list)
             labels_signals_map[image_num] = labels_signals
     else:
         process_num = len(image_nums) if processes == -1 else processes
         with mp.Pool(process_num) as pool:
-            params = [(input_path, labels_mask_range, image_num) for image_num in image_nums]
+            params = [(input_path, labels_mask_range, image_num, delete_list) for image_num in image_nums]
             labels_signals_list = pool.starmap(get_labels_signals, params)
             labels_signals_map = dict(zip(image_nums, labels_signals_list))
 
@@ -95,7 +106,7 @@ def get_cs1_signals(input_path: str,
                     image_num: int,
                     mask: str = "",
                     ) -> dict:
-    logger.info(f"Started reading CS1 signals: image_num={image_num}")
+    logger.info(f"Started reading {mask} CS1 signals: image_num={image_num}")
     cs1_signals = {}
     for mask_length in cs1_mask_range:
         cs1_signal_path = os.path.join(input_path, f"cs1_signal{mask}_K_{mask_length}_I_{image_num}.csv")
@@ -107,7 +118,7 @@ def get_cs1_signals(input_path: str,
 
         cs1_signals[mask_length] = cs1_signal
 
-    logger.info(f"Finished reading CS1 signals: image_num={image_num}")
+    logger.info(f"Finished reading {mask} CS1 signals: image_num={image_num}")
     return cs1_signals
 
 
@@ -142,7 +153,7 @@ def calculate_cs1_signals(input_path: str,
                           ) -> dict:
     cs1_signal = {}
     for mask_length in cs1_mask_range:
-        logger.info(f"Starting signal restoration: mask_length={mask_length}, image_num={image_num}")
+        logger.info(f"Starting {mask} signal restoration: mask_length={mask_length}, image_num={image_num}")
         cs1_path = os.path.join(input_path, f"cs1{mask}_K_{mask_length}_I_{image_num}.csv")
         if not os.path.isfile(cs1_path):
             msg = f"File {cs1_path} not found"
@@ -157,7 +168,7 @@ def calculate_cs1_signals(input_path: str,
         cs1_matrix = np.genfromtxt(cs1_matrix_path, delimiter=",")
 
         restored = []
-        for i in range(image_num):
+        for i in range(cs1.shape[0]):
             if i in skip_indices:
                 restored.append(np.zeros((600,)))
                 continue
@@ -188,7 +199,7 @@ def calculate_cs1_signals(input_path: str,
                 cs1_signal_file.write(to_write)
 
         cs1_signal[mask_length] = restored
-        logger.info(f"Finished signal restoration: mask_length={mask_length}, image_num={image_num}")
+        logger.info(f"Finished {mask} signal restoration: mask_length={mask_length}, image_num={image_num}")
 
     return cs1_signal
 

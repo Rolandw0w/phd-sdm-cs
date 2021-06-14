@@ -1,111 +1,18 @@
 import argparse
 import logging
-import multiprocessing as mp
 import os
+
+import numpy as np
 import sys
 
 sys.path.append(os.getcwd())
 sys.path.append(os.path.join(os.getcwd(), ".."))
 sys.path.append(os.path.join(os.getcwd(), "..", ".."))
 
-from matplotlib import pyplot as plt
-import numpy as np
-
 from py import data_wrangling as dw, metrics, plots, signals
-from py.restore_signal import restore_cs1_signal
-from py.utils import calculate_l1, perf_measure
-
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s: %(message)s')
 logger = logging.getLogger("COMPARATIVE_EXPERIMENT")
-
-
-def save_plots(plots_path: str,
-               image_nums: list,
-               features: np.array,
-               labels_signals_map: dict, cs1_signals_map: dict,
-               cs1_mask_range: list,
-               skip_indices: set):
-    for mask_length in cs1_mask_range:
-        cs1_img_l1s = {image_num: {} for image_num in image_nums}
-        labels_img_l1s = {image_num: {} for image_num in image_nums}
-        for image_num in image_nums:
-            cs1_l1s = []
-            cs1_fp = 0
-            cs1_fn = 0
-            labels_l1s = []
-            labels_fp = 0
-            labels_fn = 0
-
-            norm = image_num
-            for i in range(image_num):
-                if i in skip_indices:
-                    norm -= 1
-                    continue
-
-                features_i = features[:, i]
-                labels_i = labels_signals_map[image_num][i]
-                cs1_i = cs1_signals_map[image_num][mask_length][i]
-
-                cs1_l1 = calculate_l1(features_i, cs1_i)
-                cs1_l1s.append(cs1_l1)
-
-                labels_l1 = calculate_l1(features_i, labels_i)
-                labels_l1s.append(labels_l1)
-
-                for j in range(len(features_i)):
-                    if features_i[j] == 0 and cs1_i[j] == 1:
-                        cs1_fp += 1
-                    if features_i[j] == 1 and cs1_i[j] == 0:
-                        cs1_fn += 1
-                    if features_i[j] == 0 and labels_i[j] == 1:
-                        labels_fp += 1
-                    if features_i[j] == 1 and labels_i[j] == 0:
-                        labels_fn += 1
-
-            cs1_img_l1s[image_num]["avg_l1"] = np.mean(cs1_l1s)
-            labels_img_l1s[image_num]["avg_l1"] = np.mean(labels_l1s)
-            cs1_img_l1s[image_num]["fn_avg"] = cs1_fn / norm
-            labels_img_l1s[image_num]["fn_avg"] = labels_fn / norm
-            cs1_img_l1s[image_num]["fp_avg"] = cs1_fp / norm
-            labels_img_l1s[image_num]["fp_avg"] = labels_fp / norm
-
-        for key, y_label, title, image_name in [
-            ("avg_l1", "Average L1", "Labeled approach vs Compressed Sensing (avg L1)",
-             f"average_L1_K_{mask_length}"),
-            ("fn_avg", "Average False Negative", "Labeled approach vs Compressed Sensing (avg FN)",
-             f"average_false_negative_K_{mask_length}"),
-            ("fp_avg", "Average False Positive", "Labeled approach vs Compressed Sensing (avg FP)",
-             f"average_false_positive_K_{mask_length}"),
-        ]:
-            y_cs1 = np.array([cs1_img_l1s[image_num][key] for image_num in image_nums])
-            y_labels = np.array([labels_img_l1s[image_num][key] for image_num in image_nums])
-            x = image_nums
-
-            x_ticks = x
-            x_tick_labels = [str(k) for k in x_ticks]
-
-            y_min = np.floor(min(y_cs1.min(), y_labels.min()))
-            y_max = np.ceil(max(y_cs1.max(), y_labels.max()))
-            step = (y_max - y_min) / 20
-            y_ticks = np.arange(y_min, y_max + 1e-10, step)
-            y_tick_labels = ['%.2f' % k for k in y_ticks]
-
-            plt.xticks(x_ticks, fontsize=6, labels=x_tick_labels)
-            plt.yticks(y_ticks, labels=y_tick_labels)
-
-            plt.plot(x, y_labels, marker="o")
-            plt.plot(x, y_cs1, marker="o")
-
-            plt.legend(["Labeled approach", "Compressed Sensing"])
-            plt.xlabel("Number of images restored")
-            plt.ylabel(y_label)
-            plt.title(title)
-
-            plot_path = os.path.abspath(os.path.join(plots_path, f"{image_name}.png"))
-            plt.savefig(plot_path)
-            plt.close()
-            logger.info(f"Image {plot_path} was saved")
 
 
 def process(features_path: str,
@@ -126,40 +33,143 @@ def process(features_path: str,
 
     kanerva_radius_list = [1, 2, 3, 4, 5, 6]
     kanerva_p0s = ["0.990", "0.995"]
-    # kanerva_signals_map = signals.get_kanerva_signals_all(input_path, kanerva_radius_list, kanerva_p0s, image_nums)
+    kanerva_signals_map = signals.get_kanerva_signals_all(input_path, kanerva_radius_list, kanerva_p0s, image_nums)
 
-    # labels_signals_map = signals.get_labels_signals_all(input_path, labels_mask_range, image_nums)
+    labels_signals_map = signals.get_labels_signals_all(input_path, labels_mask_range, image_nums)
+
+    cs1_signals_map = signals.get_cs1_signals_all(input_path, cs1_mask_range, image_nums)
+
+    kanerva_metrics_map = metrics.get_kanerva_metrics_all(kanerva_signals_map, features, image_nums)
+    labels_metrics_map = metrics.get_labels_metrics_all(labels_signals_map, features, image_nums)
+    cs1_metrics_map = metrics.get_cs1_metrics_all(cs1_signals_map, features, image_nums)
+
+    plots.plot_kanerva(plots_path, kanerva_metrics_map, kanerva_radius_list, image_nums)
+    plots.plot_labels(plots_path, labels_metrics_map, labels_mask_range, image_nums)
+    plots.plot_cs1(plots_path, cs1_metrics_map, cs1_mask_range, image_nums)
+    plots.plot_comparison(plots_path, image_nums,
+                          kanerva_metrics_map, labels_metrics_map, cs1_metrics_map,
+                          1, 2, 14)
+    print()
+    # save_plots(plots_path, image_nums, features, labels_signals_map, cs1_signals_map, cs1_mask_range, skip_indices)
+
+
+def process_noisy(features_path: str,
+                  input_path: str,
+                  labels_mask_length: int,
+                  image_nums: list,
+                  plots_path: str,
+                  cs1_mask_range: list,
+                  labels_mask_range: list,
+                  multi_process: bool = False,
+                  ):
+    features = dw.get_features(features_path)
+
+    less_than_3_indices = set()
+
+    image_nums_cp = image_nums.copy()
+    image_nums_actual = []
+    for index in range(features.shape[1]):
+        if index == image_nums_cp[0]:
+            image_nums_actual.append(image_nums_cp[0] - len(less_than_3_indices))
+            del image_nums_cp[0]
+
+        feature_array = features[:, index]
+        non_zero = feature_array.nonzero()
+        non_zero_count = non_zero[0].shape[0]
+        if non_zero_count < 3:
+            less_than_3_indices.add(index)
+    image_nums_actual.append(image_nums_cp[0] - len(less_than_3_indices))
+    delete_list = sorted(list(less_than_3_indices))
+    features_filtered = np.delete(features, delete_list, axis=1)
 
     # cs1_signals_map = signals.get_cs1_signals_all(input_path, cs1_mask_range, image_nums)
 
-    # cs1_signals_noisy_1_map = signals.calculate_cs1_signals_all(os.path.abspath(os.path.join(os.getcwd(), "..", "output_noisy")),
-    #                                                             features, cs1_mask_range, image_nums, skip_indices,
-    #                                                             write_to_disk=True, mask="_noisy")
-    cs1_signals_noisy_2_map = signals.calculate_cs1_signals_all(os.path.abspath(os.path.join(os.getcwd(), "..", "output_noisy_2")),
-                                                                features, cs1_mask_range, image_nums, skip_indices,
-                                                                write_to_disk=True, mask="_noisy_2")
+    # cs1_signals_noisy_1_map = signals.calculate_cs1_signals_all(
+    #     os.path.abspath(os.path.join(os.getcwd(), "..", "output_noisy")),
+    #     features_filtered, cs1_mask_range, image_nums, set(),
+    #     write_to_disk=True, mask="_noisy")
+    # cs1_signals_noisy_2_map = signals.calculate_cs1_signals_all(
+    #     os.path.abspath(os.path.join(os.getcwd(), "..", "output_noisy_2")),
+    #     features_filtered, cs1_mask_range, image_nums, set(),
+    #     write_to_disk=True, mask="_noisy_2")
 
-    # cs1_signals_noisy_1_map = signals.get_cs1_signals_all(os.path.abspath(os.path.join(os.getcwd(), "..", "output_noisy")),
-    #                                                       cs1_mask_range, image_nums, mask="_noisy")
-    # cs1_signals_noisy_2_map = signals.get_cs1_signals_all(os.path.abspath(os.path.join(os.getcwd(), "..", "output_noisy_2")),
-    #                                                       cs1_mask_range, image_nums, mask="_noisy_2")
+    kanerva_metrics_path = os.path.abspath(os.path.join(os.getcwd(), "..", "metrics", "kanerva_metrics_3_features.json"))
+    try:
+        kanerva_metrics_map = metrics.read_metrics(kanerva_metrics_path)
+    except Exception as error:
+        logger.warning(f"Error while reading Kanerva metrics: {repr(error)}")
 
-    # kanerva_metrics_map = metrics.get_kanerva_metrics_all(kanerva_signals_map, features, image_nums)
-    # labels_metrics_map = metrics.get_labels_metrics_all(labels_signals_map, features, image_nums)
-    # cs1_metrics_map = metrics.get_cs1_metrics_all(cs1_signals_map, features, image_nums)
-    # cs1_metrics_noisy_1_map = metrics.get_cs1_metrics_all(cs1_signals_noisy_1_map, features, image_nums)
-    cs1_metrics_noisy_2_map = metrics.get_cs1_metrics_all(cs1_signals_noisy_2_map, features, image_nums)
+        kanerva_radius_list = [1, 2, 3, 4, 5, 6]
+        kanerva_p0s = ["0.990", "0.995"]
+        kanerva_signals_map = signals.get_kanerva_signals_all(input_path, kanerva_radius_list, kanerva_p0s, image_nums,
+                                                              delete_list=delete_list)
+        kanerva_metrics_map = metrics.get_kanerva_metrics_all(kanerva_signals_map, features_filtered, image_nums)
+        metrics.save_metrics(kanerva_metrics_map, kanerva_metrics_path)
 
-    # plots.plot_kanerva(plots_path, kanerva_metrics_map, kanerva_radius_list, image_nums)
-    # plots.plot_labels(plots_path, labels_metrics_map, labels_mask_range, image_nums)
-    # plots.plot_cs1(plots_path, cs1_metrics_map, cs1_mask_range, image_nums)
-    # plots.plot_cs1_noisy_1(plots_path, cs1_metrics_noisy_1_map, cs1_mask_range, image_nums)
+    jaeckel_metrics_path = os.path.abspath(os.path.join(os.getcwd(), "..", "metrics", "jaeckel_metrics_3_features.json"))
+    try:
+        jaeckel_metrics_map = metrics.read_metrics(jaeckel_metrics_path)
+    except Exception as error:
+        logger.warning(f"Error while reading Jaeckel metrics: {repr(error)}")
+
+        jaeckel_signals_map = signals.get_labels_signals_all(input_path, labels_mask_range, image_nums,
+                                                             delete_list=delete_list)
+        jaeckel_metrics_map = metrics.get_labels_metrics_all(jaeckel_signals_map, features_filtered, image_nums)
+        metrics.save_metrics(jaeckel_metrics_map, jaeckel_metrics_path)
+
+    cs1_noisy_1_metrics_path = os.path.abspath(os.path.join(os.getcwd(), "..", "metrics", "cs1_noisy_1_metrics_3_features.json"))
+    try:
+        cs1_metrics_noisy_1_map = metrics.read_metrics(cs1_noisy_1_metrics_path)
+    except Exception as error:
+        logger.warning(f"Error while reading CS SDM (1 noisy bit) metrics: {repr(error)}")
+
+        try:
+            cs1_signals_noisy_1_map = signals.get_cs1_signals_all(os.path.abspath(os.path.join(os.getcwd(), "..", "output_noisy")),
+                                                                  cs1_mask_range, image_nums, mask="_noisy")
+        except Exception as cs1_noisy_1_error:
+            logger.warning(f"Error while reading CS SDM (1 noisy bit) signals: {repr(cs1_noisy_1_error)}")
+
+            cs1_signals_noisy_1_map = signals.calculate_cs1_signals_all(
+                os.path.abspath(os.path.join(os.getcwd(), "..", "output_noisy")),
+                features_filtered, cs1_mask_range, image_nums, set(),
+                write_to_disk=True, mask="_noisy"
+            )
+        
+        cs1_metrics_noisy_1_map = metrics.get_cs1_metrics_all(cs1_signals_noisy_1_map, features_filtered, image_nums)
+        metrics.save_metrics(cs1_metrics_noisy_1_map, cs1_noisy_1_metrics_path)
+
+    cs1_noisy_2_metrics_path = os.path.abspath(os.path.join(os.getcwd(), "..", "metrics", "cs1_noisy_2_metrics_3_features.json"))
+    try:
+        cs1_metrics_noisy_2_map = metrics.read_metrics(cs1_noisy_2_metrics_path)
+    except Exception as error:
+        logger.warning(f"Error while reading CS SDM (1 noisy bit) metrics: {repr(error)}")
+
+        try:
+            cs1_signals_noisy_2_map = signals.get_cs1_signals_all(os.path.abspath(os.path.join(os.getcwd(), "..", "output_noisy_2")),
+                                                                  cs1_mask_range, image_nums, mask="_noisy_2")
+        except Exception as cs1_noisy_2_error:
+            logger.warning(f"Error while reading CS SDM (2 noisy bits) signals: {repr(cs1_noisy_2_error)}")
+
+            cs1_signals_noisy_2_map = signals.calculate_cs1_signals_all(
+                os.path.abspath(os.path.join(os.getcwd(), "..", "output_noisy_2")),
+                features_filtered, cs1_mask_range, image_nums, set(),
+                write_to_disk=True, mask="_noisy_2"
+            )
+
+        cs1_metrics_noisy_2_map = metrics.get_cs1_metrics_all(cs1_signals_noisy_2_map, features_filtered, image_nums)
+        metrics.save_metrics(cs1_metrics_noisy_2_map, cs1_noisy_2_metrics_path)
+
+    plots.plot_cs1_noisy_1(plots_path, cs1_metrics_noisy_1_map, cs1_mask_range, image_nums)
     plots.plot_cs1_noisy_2(plots_path, cs1_metrics_noisy_2_map, cs1_mask_range, image_nums)
-    # plots.plot_comparison(plots_path, image_nums,
-    #                       kanerva_metrics_map, labels_metrics_map, cs1_metrics_map,
-    #                       1, 2, 14)
+    plots.plot_noisy_comparison(plots_path, image_nums,
+                                kanerva_metrics_map, jaeckel_metrics_map,
+                                cs1_metrics_noisy_1_map, cs1_metrics_noisy_2_map,
+                                1, 2, 12, 12, image_nums_actual=image_nums_actual)
+    plots.plot_noisy_comparison_bars(plots_path, [i * 1_500 for i in range(1, 7)],
+                                     kanerva_metrics_map, jaeckel_metrics_map,
+                                     cs1_metrics_noisy_1_map, cs1_metrics_noisy_2_map,
+                                     1, 2, 12, 12, image_nums_actual=[image_nums_actual[i] for i in range(1, 18, 3)])
     print()
-    # save_plots(plots_path, image_nums, features, labels_signals_map, cs1_signals_map, cs1_mask_range, skip_indices)
 
 
 def main():
@@ -215,6 +225,10 @@ def main():
     multi_process_help = f"Difference between two subsequent image nums (default is {default_multi_process})"
     parser.add_argument("--multi_process", type=bool, help=multi_process_help, default=default_multi_process)
 
+    default_mode = "naive"
+    mode_help = f"Mode (naive/noisy, default is {default_mode})"
+    parser.add_argument("--mode", type=str, help=mode_help, default=default_mode)
+
     args = parser.parse_args()
 
     features_path = args.features
@@ -248,14 +262,28 @@ def main():
 
     cs1_mask_range = list(range(cs1_min_mask_length, cs1_max_mask_length + 1))
     image_nums = list(range(min_image_num, max_image_num + 1, image_num_step))
-    process(features_path, input_path,
-            labels_mask_length,
-            image_nums,
-            plots_path,
-            cs1_mask_range=cs1_mask_range,
-            labels_mask_range=[1, 2, 3, 4, 5],
-            multi_process=multi_process,
-            )
+
+    if args.mode == "naive":
+        process(features_path, input_path,
+                labels_mask_length,
+                image_nums,
+                plots_path,
+                cs1_mask_range=cs1_mask_range,
+                labels_mask_range=[1, 2, 3, 4, 5],
+                multi_process=multi_process,
+                )
+    elif args.mode == "noisy":
+        process_noisy(features_path, input_path,
+                      labels_mask_length,
+                      image_nums,
+                      plots_path,
+                      cs1_mask_range=cs1_mask_range,
+                      labels_mask_range=[1, 2, 3, 4, 5],
+                      multi_process=multi_process,
+                      )
+    else:
+        msg = f"Mode should be one of [\"naive\", \"noisy\"], got {args.mode}"
+        raise ValueError(msg)
 
 
 if __name__ == "__main__":
