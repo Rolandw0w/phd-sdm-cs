@@ -124,4 +124,13 @@ short* noise(const short* value, const uint length, const uint error_num, int se
     return noised_value;
 }
 
+
+char* get_time()
+{
+    auto start = std::chrono::system_clock::now();
+    std::time_t start_time = std::chrono::system_clock::to_time_t(start);
+    auto time = std::ctime(&start_time);
+    return time;
+}
+
 #endif // !utils_cpp

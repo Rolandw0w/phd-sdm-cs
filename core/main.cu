@@ -48,6 +48,48 @@ Runners::CS1RunnerParameters* get_cs1_parameters()
     return cs1_parameters;
 }
 
+Runners::CS2RunnerParameters* get_cs2_parameters()
+{
+    const uint image_count = 9000;
+    const uint image_read = 9000;
+    const uint block_count = 64;
+    const uint threads_per_block = 1024;
+    const uint bits_per_num = 1;
+    const uint mask_length = 10;
+    const uint labels_count = 150;
+    const uint target_count = 150;
+    const uint address_length = 600;
+    const uint value_length = bits_per_num*target_count;
+    const uint cells_count = 12*1000*1000;
+    const uint min_features = 3;
+    auto* cs2_parameters = new Runners::CS2RunnerParameters(image_count, image_read, block_count, threads_per_block,
+                                                            mask_length, cells_count, address_length, value_length,
+                                                            labels_count, target_count, bits_per_num, min_features);
+
+    return cs2_parameters;
+}
+
+Runners::CS2S2RunnerParameters* get_cs2_s2_parameters()
+{
+    const uint image_count = 9000;
+    const uint image_read = 9000;
+    const uint block_count = 64;
+    const uint threads_per_block = 1024;
+    const uint bits_per_num = 1;
+    const uint mask_length = 10;
+    const uint labels_count = 150;
+    const uint target_count = 150;
+    const uint address_length = 600;
+    const uint value_length = bits_per_num*target_count;
+    const uint cells_count = 12*1000*1000;
+    const uint min_features = 3;
+    auto* cs2_parameters = new Runners::CS2S2RunnerParameters(image_count, image_read, block_count, threads_per_block,
+                                                              mask_length, cells_count, address_length, value_length,
+                                                              labels_count, target_count, bits_per_num, min_features);
+
+    return cs2_parameters;
+}
+
 Runners::LabelsRunnerParameters* get_labels_parameters(ReadingType reading_type, double bio_threshold)
 {
     const uint image_count = 9000;
@@ -81,6 +123,27 @@ Runners::KanervaRunnerParameters* get_kanerva_parameters()
                                                                    max_dist, cells_count, address_length, value_length, p0);
 
     return labels_parameters;
+}
+
+Runners::SynthRunnerParameters* get_synth_parameters()
+{
+    const uint image_count = 9000;
+    const uint image_read = 9000;
+    const uint block_count = 64;
+    const uint threads_per_block = 1024;
+    const uint mask_length = 3;
+    const uint address_length = 600;
+    const uint value_length = 600;
+    const uint cells_count = 8*1000*1000;
+    const uint s = 4;
+    const uint step = 500;
+    const uint max_arrays = 25 * 1000;
+
+    auto* synth_parameters = new Runners::SynthRunnerParameters(image_count, image_read, block_count, threads_per_block,
+                                                                mask_length, cells_count, address_length, value_length,
+                                                                s, step, max_arrays);
+
+    return synth_parameters;
 }
 
 void print_report(report_map* report)
@@ -614,6 +677,514 @@ void cs1_noisy_2()
     delete(cs1_parameters);
 }
 
+void cs2_naive()
+{
+    const int image_num = 9000;
+    const int labels_count = 600;
+
+    bool* data = get_cs1(labels_count, image_num, data_root);
+
+    Runners::CS2RunnerParameters* cs2_parameters = get_cs2_parameters();
+    uint mask_lengths[] = {1, 2, 3, 4, 5};
+    uint image_counts[] = {500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000};
+
+    std::vector<report_map> reports;
+    for (auto mask_length: mask_lengths)
+    {
+        for (auto images_read: image_counts)
+        {
+            Runners::CS2Runner cs2_runner{};
+
+            cs2_parameters->images_read = images_read;
+            cs2_parameters->mask_length = mask_length;
+
+            cs2_runner.set_parameters(cs2_parameters);
+            cs2_runner.set_data(&data);
+
+            report_map naive_report = cs2_runner.naive(data_root, output_root);
+            reports.push_back(naive_report);
+            print_report(&naive_report);
+        }
+    }
+
+    std::ofstream cs2_naive;
+    cs2_naive.open(reports_root + "/cs2_naive.txt");
+    save_report_vector_json(&reports, cs2_naive);
+
+    cs2_naive.close();
+    free(data);
+    delete(cs2_parameters);
+}
+
+void cs2_noisy_1()
+{
+    const int image_num = 9000;
+    const int labels_count = 600;
+
+    bool* data = get_cs1(labels_count, image_num, data_root);
+
+    Runners::CS2RunnerParameters* cs2_parameters = get_cs2_parameters();
+    uint mask_lengths[] = {3};
+    uint image_counts[] = {500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000};
+
+    std::vector<report_map> reports;
+    for (auto mask_length: mask_lengths)
+    {
+        for (auto images_read: image_counts)
+        {
+            Runners::CS2Runner cs2_runner{};
+
+            cs2_parameters->images_read = images_read;
+            cs2_parameters->mask_length = mask_length;
+
+            cs2_runner.set_parameters(cs2_parameters);
+            cs2_runner.set_data(&data);
+
+            report_map naive_report = cs2_runner.noisy(data_root, output_root);
+            reports.push_back(naive_report);
+            print_report(&naive_report);
+        }
+    }
+
+    std::ofstream cs2_naive;
+    cs2_naive.open(reports_root + "/cs2_naive.txt");
+    save_report_vector_json(&reports, cs2_naive);
+
+    cs2_naive.close();
+    free(data);
+    delete(cs2_parameters);
+}
+
+void cs2_noisy_2()
+{
+    const int image_num = 9000;
+    const int labels_count = 600;
+
+    bool* data = get_cs1(labels_count, image_num, data_root);
+
+    Runners::CS2RunnerParameters* cs2_parameters = get_cs2_parameters();
+    uint mask_lengths[] = {3};
+    uint image_counts[] = {500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000};
+
+    std::vector<report_map> reports;
+    for (auto mask_length: mask_lengths)
+    {
+        for (auto images_read: image_counts)
+        {
+            Runners::CS2Runner cs2_runner{};
+
+            cs2_parameters->images_read = images_read;
+            cs2_parameters->mask_length = mask_length;
+
+            cs2_runner.set_parameters(cs2_parameters);
+            cs2_runner.set_data(&data);
+
+            report_map naive_report = cs2_runner.noisy_2(data_root, output_root);
+            reports.push_back(naive_report);
+            print_report(&naive_report);
+        }
+    }
+
+    std::ofstream cs2_naive;
+    cs2_naive.open(reports_root + "/cs2_naive.txt");
+    save_report_vector_json(&reports, cs2_naive);
+
+    cs2_naive.close();
+    free(data);
+    delete(cs2_parameters);
+}
+
+void cs2_naive_geq_3()
+{
+    const int image_num = 9000;
+    const int labels_count = 600;
+
+    bool* data = get_cs1(labels_count, image_num, data_root);
+
+    Runners::CS2RunnerParameters* cs2_parameters = get_cs2_parameters();
+    uint mask_lengths[] = {3};
+    uint image_counts[] = {500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000};
+
+    std::vector<report_map> reports;
+    for (auto mask_length: mask_lengths)
+    {
+        for (auto images_read: image_counts)
+        {
+            Runners::CS2Runner cs2_runner{};
+
+            cs2_parameters->images_read = images_read;
+            cs2_parameters->mask_length = mask_length;
+
+            cs2_runner.set_parameters(cs2_parameters);
+            cs2_runner.set_data(&data);
+
+            report_map naive_report = cs2_runner.naive_geq_3(data_root, output_root);
+            reports.push_back(naive_report);
+            print_report(&naive_report);
+        }
+    }
+
+    std::ofstream cs2_naive;
+    cs2_naive.open(reports_root + "/cs2_geq_4_naive.txt");
+    save_report_vector_json(&reports, cs2_naive);
+
+    cs2_naive.close();
+    free(data);
+    delete(cs2_parameters);
+}
+
+void cs2_naive_geq_3_s1()
+{
+    const int image_num = 9000;
+    const int labels_count = 600;
+
+    bool* data = get_cs1(labels_count, image_num, data_root);
+
+    Runners::CS2RunnerParameters* cs2_parameters = get_cs2_parameters();
+    uint mask_lengths[] = {3, 4, 5};
+    uint image_counts[] = {500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000};
+
+    std::vector<report_map> reports;
+    for (auto mask_length: mask_lengths)
+    {
+        for (auto images_read: image_counts)
+        {
+            Runners::CS2Runner cs2_runner{};
+
+            cs2_parameters->images_read = images_read;
+            cs2_parameters->mask_length = mask_length;
+
+            cs2_runner.set_parameters(cs2_parameters);
+            cs2_runner.set_data(&data);
+
+            report_map naive_report = cs2_runner.naive_geq_3_s1(data_root, output_root);
+            reports.push_back(naive_report);
+            print_report(&naive_report);
+        }
+    }
+
+    std::ofstream cs2_naive;
+    cs2_naive.open(reports_root + "/cs2_geq_3_s1.txt");
+    save_report_vector_json(&reports, cs2_naive);
+
+    cs2_naive.close();
+    free(data);
+    delete(cs2_parameters);
+}
+
+void cs2_s2_naive_geq_3()
+{
+    const int image_num = 9000;
+    const int labels_count = 600;
+
+    bool* data = get_cs1(labels_count, image_num, data_root);
+
+    Runners::CS2S2RunnerParameters* cs2_s2_parameters = get_cs2_s2_parameters();
+    uint mask_lengths[] = {8, 9, 10, 11, 12, 13, 14, 15, 16};
+    uint image_counts[] = {500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000};
+
+    std::vector<report_map> reports;
+    for (auto mask_length: mask_lengths)
+    {
+        for (auto images_read: image_counts)
+        {
+            Runners::CS2S2Runner cs2_s1_runner{};
+
+            cs2_s2_parameters->images_read = images_read;
+            cs2_s2_parameters->mask_length = mask_length;
+
+            cs2_s1_runner.set_parameters(cs2_s2_parameters);
+            cs2_s1_runner.set_data(&data);
+
+            report_map naive_report = cs2_s1_runner.naive_geq_3(data_root, output_root);
+            reports.push_back(naive_report);
+            print_report(&naive_report);
+        }
+    }
+
+    std::ofstream cs2_naive;
+    cs2_naive.open(reports_root + "/cs2_geq_3_s1.txt");
+    save_report_vector_json(&reports, cs2_naive);
+
+    cs2_naive.close();
+    free(data);
+    delete(cs2_s2_parameters);
+}
+
+void synth_jaeckel()
+{
+    Runners::SynthRunnerParameters* synth_parameters = get_synth_parameters();
+    uint num_ones_arr[] = {4, 5, 6, 7, 8, 9, 10};
+
+    std::vector<report_map> reports;
+    for (auto num_ones: num_ones_arr)
+    {
+        Runners::SynthRunner synth_runner{};
+
+        synth_parameters->num_ones = num_ones;
+
+        synth_runner.set_parameters(synth_parameters);
+
+        report_map jaeckel_report = synth_runner.jaeckel(data_root, output_root);
+        reports.push_back(jaeckel_report);
+        print_report(&jaeckel_report);
+    }
+
+    std::ofstream synth_jaeckel_file;
+    synth_jaeckel_file.open(reports_root + "/synth_jaeckel.txt");
+    save_report_vector_json(&reports, synth_jaeckel_file);
+
+    synth_jaeckel_file.close();
+    delete(synth_parameters);
+}
+
+void synth_labels()
+{
+    Runners::SynthRunnerParameters* synth_parameters = get_synth_parameters();
+    uint num_ones_arr[] = {4, 5, 6, 7, 8, 9, 10};
+
+    std::vector<report_map> reports;
+    for (auto num_ones: num_ones_arr)
+    {
+        Runners::SynthRunner synth_runner{};
+
+        synth_parameters->num_ones = num_ones;
+
+        synth_runner.set_parameters(synth_parameters);
+
+        report_map jaeckel_report = synth_runner.labels(data_root, output_root);
+        reports.push_back(jaeckel_report);
+        print_report(&jaeckel_report);
+    }
+
+    std::ofstream synth_jaeckel_file;
+    synth_jaeckel_file.open(reports_root + "/synth_labels.txt");
+    save_report_vector_json(&reports, synth_jaeckel_file);
+
+    synth_jaeckel_file.close();
+    delete(synth_parameters);
+}
+
+void synth_cs_conf1()
+{
+    Runners::SynthRunnerParameters* synth_parameters = get_synth_parameters();
+    uint mask_lengths[] = {12, 14};
+    uint num_ones_arr[] = {4, 5, 6, 7, 8, 9, 10};
+    uint cells_counts[] = {24};
+
+    std::vector<report_map> reports;
+    for (auto mask_length: mask_lengths)
+    {
+        for (auto num_ones: num_ones_arr)
+        {
+            for (auto cells_count: cells_counts)
+            {
+                Runners::SynthRunner synth_runner{};
+
+                synth_parameters->mask_length = mask_length;
+                synth_parameters->num_ones = num_ones;
+                synth_parameters->value_length = 150;
+                synth_parameters->address_length = 150;
+                synth_parameters->cells_count = cells_count*1000*1000;
+
+                synth_runner.set_parameters(synth_parameters);
+
+                report_map jaeckel_report = synth_runner.cs_conf1(data_root, output_root);
+                reports.push_back(jaeckel_report);
+                print_report(&jaeckel_report);
+            }
+        }
+    }
+
+    std::ofstream synth_jaeckel_file;
+    synth_jaeckel_file.open(reports_root + "/synth_cs_conf1.txt");
+    save_report_vector_json(&reports, synth_jaeckel_file);
+
+    synth_jaeckel_file.close();
+    delete(synth_parameters);
+}
+
+void synth_cs_conf2()
+{
+    Runners::SynthRunnerParameters* synth_parameters = get_synth_parameters();
+    uint mask_lengths[] = {3};
+    uint num_ones_arr[] = {4, 5, 6, 7, 8, 9, 10};
+    uint cells_counts[] = {24};
+
+    std::vector<report_map> reports;
+    for (auto mask_length: mask_lengths)
+    {
+        for (auto num_ones: num_ones_arr)
+        {
+            for (auto cells_count: cells_counts)
+            {
+                Runners::SynthRunner synth_runner{};
+
+                synth_parameters->mask_length = mask_length;
+                synth_parameters->num_ones = num_ones;
+                synth_parameters->value_length = 150;
+                synth_parameters->address_length = 600;
+                synth_parameters->cells_count = cells_count*1000*1000;
+
+                synth_runner.set_parameters(synth_parameters);
+
+                report_map jaeckel_report = synth_runner.cs_conf2(data_root, output_root);
+                reports.push_back(jaeckel_report);
+                print_report(&jaeckel_report);
+            }
+        }
+    }
+
+    std::ofstream synth_jaeckel_file;
+    synth_jaeckel_file.open(reports_root + "/synth_cs_conf2.txt");
+    save_report_vector_json(&reports, synth_jaeckel_file);
+
+    synth_jaeckel_file.close();
+    delete(synth_parameters);
+}
+
+void synth_cs_conf3()
+{
+    Runners::SynthRunnerParameters* synth_parameters = get_synth_parameters();
+    uint mask_lengths[] = {8};
+    uint num_ones_arr[] = {4, 5, 6, 7, 8, 9, 10};
+
+    std::map<int, std::vector<std::pair<short, int>>> map = {
+            {4,{
+                {16, 55},
+                //{15, 60},
+                {14, 65},
+                //{13, 70},
+                {12, 75},
+                //{11, 80},
+                {10, 85},
+                //{9, 90},
+                {8, 95}
+            }},
+            {5,{
+                {16, 45},
+                //{15, 48},
+                {14, 51},
+                //{13, 54},
+                {12, 57},
+                //{11, 60},
+                {10, 63},
+                //{9, 66},
+                {8, 69}
+            }},
+            {6,{
+                {16, 37},
+                //{15, 40},
+                {14, 43},
+                //{13, 46},
+                {12, 49},
+                //{11, 52},
+                {10, 55},
+                //{9, 58},
+                {8, 61}
+            }},
+            {7,{{16, 32}, {14, 36}, {12, 40}, {10, 44}, {8, 48}}},
+            {8,{{16, 28},{14, 32}, {12, 36}, {10, 40}, {8, 44}}},
+            {9,{{16, 25}, {14, 27}, {12, 29}, {10, 31}, {8, 33}}},
+            {10,{{16, 23}, {14, 25}, {12, 27}, {10, 29}, {8, 31}}},
+    };
+
+    std::vector<report_map> reports;
+    for (auto mask_length: mask_lengths)
+    {
+        for (auto num_ones: num_ones_arr)
+        {
+            auto pairs = map[num_ones];
+            for (auto pair: pairs)
+            {
+                auto coef = pair.first;
+                auto cells_count = pair.second;
+                auto m = coef*num_ones;
+
+                Runners::SynthRunner synth_runner{};
+
+                synth_parameters->mask_length = mask_length;
+                synth_parameters->num_ones = num_ones;
+                synth_parameters->value_length = m;
+                synth_parameters->address_length = m;
+                synth_parameters->cells_count = cells_count*1000*1000;
+                synth_parameters->max_arrays = 10*1000;
+
+                synth_runner.set_parameters(synth_parameters);
+
+                report_map jaeckel_report = synth_runner.cs_conf3(data_root, output_root);
+                reports.push_back(jaeckel_report);
+                print_report(&jaeckel_report);
+            }
+        }
+    }
+
+    std::ofstream synth_jaeckel_file;
+    synth_jaeckel_file.open(reports_root + "/synth_cs_conf3.txt");
+    save_report_vector_json(&reports, synth_jaeckel_file);
+
+    synth_jaeckel_file.close();
+    delete(synth_parameters);
+}
+
+void synth_cs_conf4()
+{
+    Runners::SynthRunnerParameters* synth_parameters = get_synth_parameters();
+    uint mask_lengths[] = {3};
+    uint num_ones_arr[] = {4, 5, 6, 7, 8, 9, 10};
+
+    std::map<int, std::vector<std::pair<short, int>>> map = {
+//            {4,{{16, 55}, {14, 65}, {12, 75}, {10, 85}, {8, 95}, {6, 105}, {4, 115}}},
+//            {5,{{16, 45}, {14, 51}, {12, 57}, {10, 63}, {8, 69}, {6, 75}, {4, 81}}},
+            {6,{{16, 37}, {14, 43}, {12, 49}, {10, 55}, {8, 61}, {6, 67}, {4, 73}}},
+            {7,{{16, 32}, {14, 36}, {12, 40}, {10, 44}, {8, 48}, {6, 52}, {4, 56}}},
+            {8,{{16, 28}, {14, 32}, {12, 36}, {10, 40}, {8, 44}, {6, 48}, {4, 52}}},
+            {9,{{16, 25}, {14, 27}, {12, 29}, {10, 31}, {8, 33}, {6, 35}, {4, 37}}},
+            {10,{{16, 23}, {14, 25}, {12, 27}, {10, 29}, {8, 31}, {6, 33}, {4, 35}}},
+    };
+
+    std::vector<report_map> reports;
+    for (auto mask_length: mask_lengths)
+    {
+        for (auto num_ones: num_ones_arr)
+        {
+            auto pairs = map[num_ones];
+            for (auto pair: pairs)
+            {
+                auto coef = pair.first;
+                if (coef <= 6)
+                    continue;
+
+                auto cells_count = pair.second;
+                auto m = coef*num_ones;
+
+                Runners::SynthRunner synth_runner{};
+
+                synth_parameters->mask_length = mask_length;
+                synth_parameters->num_ones = num_ones;
+                synth_parameters->value_length = m;
+                synth_parameters->address_length = 600;
+                synth_parameters->cells_count = cells_count*1000*1000;
+                synth_parameters->max_arrays = 25*1000;
+
+                synth_runner.set_parameters(synth_parameters);
+
+                report_map jaeckel_report = synth_runner.cs_conf4(data_root, output_root);
+                reports.push_back(jaeckel_report);
+                print_report(&jaeckel_report);
+            }
+        }
+    }
+
+    std::ofstream synth_jaeckel_file;
+    synth_jaeckel_file.open(reports_root + "/synth_cs_conf4.txt");
+    save_report_vector_json(&reports, synth_jaeckel_file);
+
+    synth_jaeckel_file.close();
+    delete(synth_parameters);
+}
+
+
 int main(int argc, char** argv)
 {
     if (argc == 0)
@@ -625,8 +1196,8 @@ int main(int argc, char** argv)
     output_root = argv[3];
     std::string experiment_num = argv[4];
     int experiment_num_int = std::stoi(experiment_num);
-    if (experiment_num_int < 1 || experiment_num_int > 8)
-        throw std::invalid_argument("Only {1,2,3,4,5,6,7,8} experiments are available now");
+    if (experiment_num_int < 1 || experiment_num_int > 20)
+        throw std::invalid_argument("Only {1,...,20} experiments are available now");
 
     typedef std::pair < std::string, std::function<void(void)>> test_type;
     std::vector<test_type> tests;
@@ -676,6 +1247,54 @@ int main(int argc, char** argv)
     if (experiment_num_int == 8)
     {
         tests.emplace_back( "Noisy test for CS SDM (2 bits)", cs1_noisy_2 );
+    }
+    if (experiment_num_int == 9)
+    {
+        tests.emplace_back( "CS2 naive test", cs2_naive );
+    }
+    if (experiment_num_int == 10)
+    {
+        tests.emplace_back( "CS2 noisy test (1 feature dropped)", cs2_noisy_1 );
+    }
+    if (experiment_num_int == 11)
+    {
+        tests.emplace_back( "CS2 noisy test (2 features dropped)", cs2_noisy_2 );
+    }
+    if (experiment_num_int == 12)
+    {
+        tests.emplace_back( "CS2 naive test >= 3", cs2_naive_geq_3 );
+    }
+    if (experiment_num_int == 13)
+    {
+        tests.emplace_back( "CS2 naive test >= 3 S1", cs2_naive_geq_3_s1 );
+    }
+    if (experiment_num_int == 14)
+    {
+        tests.emplace_back( "CS2 naive test >= 3 S2", cs2_s2_naive_geq_3 );
+    }
+    if (experiment_num_int == 15)
+    {
+        tests.emplace_back( "Jaeckel synth", synth_jaeckel );
+    }
+    if (experiment_num_int == 16)
+    {
+        tests.emplace_back( "Labels synth", synth_labels );
+    }
+    if (experiment_num_int == 17)
+    {
+        tests.emplace_back( "CS config 1 synth", synth_cs_conf1 );
+    }
+    if (experiment_num_int == 18)
+    {
+        tests.emplace_back( "CS config 2 synth", synth_cs_conf2 );
+    }
+    if (experiment_num_int == 19)
+    {
+        tests.emplace_back( "CS config 3 synth", synth_cs_conf3 );
+    }
+    if (experiment_num_int == 20)
+    {
+        tests.emplace_back( "CS config 4 synth", synth_cs_conf4 );
     }
 
     std::cout.precision(6);

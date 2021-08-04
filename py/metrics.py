@@ -151,7 +151,7 @@ def get_cs1_metrics(masks_signals: dict, features: np.array, image_num: int):
         l1s = []
         fns = []
         fps = []
-        for i in range(signals.shape[0]):
+        for i in range(len(signals)):
             features_i = features[:, i]
             signal_i = signals[i]
 

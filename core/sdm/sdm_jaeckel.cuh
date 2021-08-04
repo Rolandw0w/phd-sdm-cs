@@ -5,33 +5,34 @@
 
 
 template<typename cell_type, typename index_type, typename summation_type>
-struct SDM_JAECKEL : SDM_BASE<cell_type, index_type, summation_type>
+struct SDM_JAECKEL //: SDM_BASE<cell_type, index_type, summation_type>
 {
 public:
-	uint K;
-	uint L;
-	uint M;
-	uint N;
+	ulong K;
+	ulong L;
+	ulong M;
+	ulong N;
 
 	cell_type* cells;
 	index_type* indices;
 	bool* bits;
 
-	uint block_count;
-	uint threads_per_block;
-	uint thread_count;
+	ulong block_count;
+	ulong threads_per_block;
+	ulong thread_count;
 
-	SDM_JAECKEL(uint K, uint L, uint M, uint N, uint block_count, uint threads_per_block);
+	SDM_JAECKEL(ulong K, ulong L, ulong M, ulong N, ulong block_count, ulong threads_per_block, double zero_proba = 0.5,
+                index_type* mask_indices = NULL);
 	~SDM_JAECKEL();
 
 	bool* read(const bool* value);
 	bool* read(const bool* value, int iter_count);
 	bool* read(const bool* value, const bool* address);
 
-	void write(const bool *value);
-	void write(const bool *value, const int times);
-	void write(const bool *value, const bool *address);
-	void write(const bool *value, const bool *address, const int times);
+	int write(const bool *value);
+    int write(const bool *value, const int times);
+    int write(const bool *value, const bool *address);
+    int write(const bool *value, const bool *address, const int times);
 
 	cell_type get_min_activations();
 	cell_type get_max_activations();
@@ -42,7 +43,8 @@ public:
 };
 
 template<typename cell_type, typename index_type, typename summation_type>
-SDM_JAECKEL<cell_type, index_type, summation_type>::SDM_JAECKEL(uint K, uint L, uint M, uint N, uint block_count, uint threads_per_block)
+SDM_JAECKEL<cell_type, index_type, summation_type>::SDM_JAECKEL(ulong K, ulong L, ulong M, ulong N, ulong block_count, ulong threads_per_block,
+                                                                double zero_proba, index_type* mask_indices)
 {
 	this->K = K;
 	this->L = L;
@@ -60,8 +62,10 @@ SDM_JAECKEL<cell_type, index_type, summation_type>::SDM_JAECKEL(uint K, uint L, 
     kernel_decorator(
             init_jaeckel<cell_type, index_type>,
             block_count, threads_per_block, true,
-            cells, indices, bits, K, L, M, N, thread_count
+            cells, indices, bits, K, L, M, N, thread_count, zero_proba
     );
+    if (mask_indices != NULL)
+        cuda_memcpy_to_gpu(indices, mask_indices, K*N);
 }
 
 template<typename cell_type, typename index_type, typename summation_type>
@@ -109,6 +113,23 @@ bool* SDM_JAECKEL<cell_type, index_type, summation_type>::read(const bool* value
 	cuda_memcpy_from_gpu(activation_counter, cuda_activation_counter, 1);
 	int activated_cells_number = activation_counter[0];
 
+	if (activated_cells_number == 0)
+    {
+        bool* result = (bool*)malloc(M * sizeof(bool));
+        memset(result, 0, M * sizeof(bool));
+
+        free(activation_counter);
+
+        cuda_free(cuda_activation_counter);
+        cuda_free(cuda_address);
+        cuda_free(cuda_activation_indices);
+        cuda_free(cuda_sum);
+        cuda_free(cuda_value);
+        cuda_free(cuda_result);
+
+        return result;
+    }
+
     kernel_decorator(
             read_jaeckel<cell_type, index_type, summation_type>,
             block_count, threads_per_block, true,
@@ -118,7 +139,7 @@ bool* SDM_JAECKEL<cell_type, index_type, summation_type>::read(const bool* value
     kernel_decorator(
             get_result<summation_type>,
             block_count, threads_per_block, true,
-            cuda_sum, cuda_value, M, thread_count, 0.0
+            cuda_sum, cuda_result, M, thread_count, 0.0
     );
 
 	cuda_free(cuda_activation_counter);
@@ -207,27 +228,26 @@ bool* SDM_JAECKEL<cell_type, index_type, summation_type>::read(const bool* value
 }
 
 template<typename cell_type, typename index_type, typename summation_type>
-void SDM_JAECKEL<cell_type, index_type, summation_type>::write(const bool *value)
+int SDM_JAECKEL<cell_type, index_type, summation_type>::write(const bool *value)
 {
-	this->write(value, 1);
+    return this->write(value, 1);
 }
 
 template<typename cell_type, typename index_type, typename summation_type>
-void SDM_JAECKEL<cell_type, index_type, summation_type>::write(const bool *value, const int times)
+int SDM_JAECKEL<cell_type, index_type, summation_type>::write(const bool *value, const int times)
 {
-	this->write(value, value, times);
+    return this->write(value, value, times);
 }
 
 template<typename cell_type, typename index_type, typename summation_type>
-void SDM_JAECKEL<cell_type, index_type, summation_type>::write(const bool *value, const bool *address)
+int SDM_JAECKEL<cell_type, index_type, summation_type>::write(const bool *value, const bool *address)
 {
-	this->write(value, address, 1);
+    return this->write(value, address, 1);
 }
 
 template<typename cell_type, typename index_type, typename summation_type>
-void SDM_JAECKEL<cell_type, index_type, summation_type>::write(const bool *value, const bool *address, const int times)
+int SDM_JAECKEL<cell_type, index_type, summation_type>::write(const bool *value, const bool *address, const int times)
 {
-
 	bool* cuda_value;
 	cuda_malloc(&cuda_value, M);
 	cuda_memcpy_to_gpu(cuda_value, value, M);
@@ -264,6 +284,17 @@ void SDM_JAECKEL<cell_type, index_type, summation_type>::write(const bool *value
 	cuda_memcpy_from_gpu(activation_counter, cuda_activation_counter, 1);
 	int activated_cells_number = activation_counter[0];
 
+	if (activated_cells_number == 0)
+    {
+        cuda_free(cuda_address);
+        cuda_free(cuda_to_add);
+        cuda_free(cuda_value);
+        cuda_free(cuda_activation_indices);
+        cuda_free(cuda_activation_counter);
+
+        return 0;
+    }
+
     kernel_decorator(
             write_jaeckel<cell_type, index_type>,
             block_count, threads_per_block, true,
@@ -277,6 +308,8 @@ void SDM_JAECKEL<cell_type, index_type, summation_type>::write(const bool *value
     cuda_free(cuda_address);
     cuda_free(cuda_to_add);
     cuda_free(cuda_value);
+
+    return activated_cells_number;
 }
 
 template<typename cell_type, typename index_type, typename summation_type>
@@ -289,7 +322,7 @@ cell_type SDM_JAECKEL<cell_type, index_type, summation_type>::get_min_activation
 	cell_type* cuda_cell;
 	cuda_malloc(&cuda_cell, M + 1);
 
-	for (uint i = 0; i < N; i++)
+	for (ulong i = 0; i < N; i++)
 	{
 	    kernel_decorator(
                 copy_chunk<cell_type>,
@@ -320,7 +353,7 @@ cell_type SDM_JAECKEL<cell_type, index_type, summation_type>::get_max_activation
 	cell_type* cuda_cell;
     cuda_malloc(&cuda_cell, M + 1);
 
-	for (uint i = 0; i < N; i++)
+	for (ulong i = 0; i < N; i++)
 	{
         kernel_decorator(
                 copy_chunk<cell_type>,
@@ -351,7 +384,7 @@ long SDM_JAECKEL<cell_type, index_type, summation_type>::get_activations_num()
 	cell_type* cuda_cell;
     cuda_malloc(&cuda_cell, M + 1);
 
-	for (uint i = 0; i < N; i++)
+	for (ulong i = 0; i < N; i++)
 	{
         kernel_decorator(
                 copy_chunk<cell_type>,
@@ -391,7 +424,7 @@ void SDM_JAECKEL<cell_type, index_type, summation_type>::print_state()
 	bool* cuda_bits_mask;
     cuda_malloc(&cuda_bits_mask, K);
 
-	for (uint i = 0; i < 10; i++)
+	for (ulong i = 0; i < 10; i++)
 	{
 	    kernel_decorator(
                 copy_chunk<index_type>,
@@ -407,7 +440,7 @@ void SDM_JAECKEL<cell_type, index_type, summation_type>::print_state()
         cuda_memcpy_from_gpu(bits_mask, cuda_bits_mask, K);
 
 		std::cout << "[";
-		for (uint k = 0; k < K; k++)
+		for (ulong k = 0; k < K; k++)
 		{
 			std::cout << "(" << indices_mask[k] << ":" << bits_mask[k] << ")";
 		}
@@ -421,7 +454,7 @@ void SDM_JAECKEL<cell_type, index_type, summation_type>::print_state()
                 cells, cuda_cell, i*(M + 1), (M + 1), thread_count
         );
 		cuda_memcpy_from_gpu(cell, cuda_cell, M + 1);
-		for (uint j = 0; j < M + 1; j++)
+		for (ulong j = 0; j < M + 1; j++)
 		{
 			std::cout << cell[j] << "  ";
 		}

@@ -4,7 +4,7 @@ import numpy as np
 def get_transformation(matrix_path) -> np.ndarray:
     with open(matrix_path, "r") as f:
         content = f.read()
-        transformation = [[int(x) for x in line.split(",")[:-1]] for line in content.splitlines()]
+        transformation = [[int(x) for x in line.split(",")] for line in content.splitlines()]
         transformation_np = np.array(transformation)
         return transformation_np
 

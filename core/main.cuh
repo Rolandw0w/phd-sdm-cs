@@ -14,12 +14,18 @@
 
 #include "runners/cifar10_runner.cuh"
 #include "runners/cs1_runner.cuh"
+#include "runners/cs2_runner.cuh"
+#include "runners/cs2_s2_runner.cuh"
 #include "runners/kanerva_runner.cuh"
 #include "runners/labels_runner.cuh"
+#include "runners/synth_runner.cuh"
 
 Runners::CIFAR10RunnerParameters* get_cifar10_parameters();
 Runners::CS1RunnerParameters* get_cs1_parameters();
+Runners::CS2RunnerParameters* get_cs2_parameters();
+Runners::CS2S2RunnerParameters* get_cs2_s2_parameters();
 Runners::LabelsRunnerParameters* get_labels_parameters(ReadingType reading_type, double bio_threshold = 0.0);
+Runners::SynthRunnerParameters* get_synth_parameters();
 struct TestData
 {
 	uint image_num;

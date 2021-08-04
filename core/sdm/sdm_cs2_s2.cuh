@@ -1,11 +1,11 @@
-#ifndef sdm_cs1_cuh
-#define sdm_cs1_cuh
+#ifndef sdm_cs2_s1_cuh
+#define sdm_cs2_s1_cuh
 
 #include "sdm_base.cuh"
 
 
 template<typename cell_type, typename index_type, typename summation_type, typename value_type>
-struct SDM_CS1// : SDM_BASE<cell_type, index_type, summation_type>
+struct SDM_CS2_S2// : SDM_BASE<cell_type, index_type, summation_type>
 {
 public:
     uint K;
@@ -16,19 +16,20 @@ public:
     cell_type* cells;
     index_type* indices;
     bool* bits;
+    index_type* num_ones;
 
     uint block_count;
     uint threads_per_block;
     uint thread_count;
 
-    SDM_CS1(uint K, uint L, uint M, uint N, uint block_count, uint threads_per_block, index_type* mask_indices = NULL);
-    ~SDM_CS1();
+    SDM_CS2_S2(uint K, uint L, uint M, uint N, uint block_count, uint threads_per_block);
+    ~SDM_CS2_S2();
 
-    double* read(const value_type* value);
+    double* read(const bool* address);
 
     int write(const value_type* value);
-    int write(const value_type* value, const value_type* address);
-    int write(const value_type* value, const value_type* address, double mult);
+    int write(const value_type* value, const bool* address);
+    int write(const value_type* value, const bool* address, double mult);
 
     cell_type get_min_activations();
     cell_type get_max_activations();
@@ -39,7 +40,7 @@ public:
 };
 
 template<typename cell_type, typename index_type, typename summation_type, typename value_type>
-SDM_CS1<cell_type, index_type, summation_type, value_type>::SDM_CS1(uint K, uint L, uint M, uint N, uint block_count, uint threads_per_block, index_type* mask_indices)
+SDM_CS2_S2<cell_type, index_type, summation_type, value_type>::SDM_CS2_S2(uint K, uint L, uint M, uint N, uint block_count, uint threads_per_block)
 {
     this->K = K;
     this->L = L;
@@ -53,30 +54,30 @@ SDM_CS1<cell_type, index_type, summation_type, value_type>::SDM_CS1(uint K, uint
     cuda_malloc(&cells, N * (M + 1));
     cuda_malloc(&indices, K * N);
     cuda_malloc(&bits, K * N);
+    cuda_malloc(&num_ones, N);
 
     kernel_decorator(
-            init_jaeckel<cell_type, index_type>,
+            init_jaeckel_num_ones<cell_type, index_type>,
             block_count, threads_per_block, true,
-            cells, indices, bits, K, L, M, N, thread_count, 0.5
+            cells, indices, bits, K, L, M, N, thread_count, num_ones, 0.5
     );
-    if (mask_indices != NULL)
-        cuda_memcpy_to_gpu(indices, mask_indices, K*N);
 }
 
 template<typename cell_type, typename index_type, typename summation_type, typename value_type>
-SDM_CS1<cell_type, index_type, summation_type, value_type>::~SDM_CS1()
+SDM_CS2_S2<cell_type, index_type, summation_type, value_type>::~SDM_CS2_S2()
 {
     cuda_free(cells);
     cuda_free(indices);
     cuda_free(bits);
+    cuda_free(num_ones);
 }
 
 template<typename cell_type, typename index_type, typename summation_type, typename value_type>
-double* SDM_CS1<cell_type, index_type, summation_type, value_type>::read(const value_type* value)
+double* SDM_CS2_S2<cell_type, index_type, summation_type, value_type>::read(const bool* address)
 {
-    value_type* cuda_value;
-    cuda_malloc(&cuda_value, M);
-    cuda_memcpy_to_gpu(cuda_value, value, M);
+    bool* cuda_address;
+    cuda_malloc(&cuda_address, L);
+    cuda_memcpy_to_gpu(cuda_address, address, L);
 
     int* cuda_activation_indices;
     cuda_malloc(&cuda_activation_indices, N);
@@ -92,17 +93,13 @@ double* SDM_CS1<cell_type, index_type, summation_type, value_type>::read(const v
     activation_counter[0] = 0;
     cuda_memcpy_to_gpu(cuda_activation_counter, activation_counter, 1);
 
-    auto t1 = get_current_time_millis();
     kernel_decorator(
-            get_activated_cells_cs1<cell_type, index_type, summation_type, value_type>,
+            get_activated_cells<cell_type, index_type, summation_type>,
             block_count, threads_per_block, true,
-            indices, bits, K, M, N, thread_count, cuda_value, cuda_activation_indices, cuda_activation_counter
+            indices, bits, K, M, N, thread_count, cuda_address, cuda_activation_indices, cuda_activation_counter
     );
-//    std::cout << "get_activated_cells_cs1 " << get_current_time_millis() - t1 << "; ";
 
     cuda_memcpy_from_gpu(activation_counter, cuda_activation_counter, 1);
-
-    //std::cout << activation_counter[0] << "\n";
 
     if (activation_counter[0] == 0)
     {
@@ -114,73 +111,59 @@ double* SDM_CS1<cell_type, index_type, summation_type, value_type>::read(const v
         cuda_free(cuda_activation_counter);
         cuda_free(cuda_activation_indices);
         cuda_free(cuda_sum);
-        cuda_free(cuda_value);
+        cuda_free(cuda_address);
 
         return result;
     }
 
-    double* cuda_sum_act;
+    int* cuda_sum_act;
     cuda_malloc(&cuda_sum_act, 1);
-    auto t2 = get_current_time_millis();
     kernel_decorator(
-            get_acts_sum<cell_type, double>,
+            get_acts_sum<cell_type, int>,
             block_count, threads_per_block, true,
             cells, cuda_activation_indices, M, cuda_activation_counter, cuda_sum_act, thread_count
     );
-    double* sum_act = (double*) malloc(1 * sizeof(double));
-    cuda_memcpy_from_gpu(sum_act, cuda_sum_act, 1);
-    double sum_activated = sum_act[0];
 
     kernel_decorator(
-            read_cs1_v3<cell_type, index_type, summation_type>,
+            read_cs1_s2<cell_type, index_type, summation_type>,
             block_count, threads_per_block, true,
-            cells, cuda_activation_indices, M, thread_count, cuda_sum, cuda_activation_counter, cuda_sum_act
+            cells, cuda_activation_indices, M, thread_count, cuda_sum, cuda_activation_counter, cuda_sum_act, num_ones
     );
 
     double* result = (double*) malloc(M * sizeof(double));
     cuda_memcpy_from_gpu(result, cuda_sum, M);
 
-    for (int i = 0; i < M; i++)
-        if (abs(sum_activated) < 1e-6)
-            result[i] = 0.0;
-        else result[i] /= sum_activated;
-
     free(activation_counter);
-    free(sum_act);
 
     cuda_free(cuda_activation_counter);
     cuda_free(cuda_activation_indices);
     cuda_free(cuda_sum);
-    cuda_free(cuda_value);
+    cuda_free(cuda_address);
     cuda_free(cuda_sum_act);
-
-//    for (int i = 0; i < M; i++)
-//        std::cout << result[i] << " ";
-//    std::cout << std::endl;
 
     return result;
 }
 
 template<typename cell_type, typename index_type, typename summation_type, typename value_type>
-int SDM_CS1<cell_type, index_type, summation_type, value_type>::write(const value_type *value)
+int SDM_CS2_S2<cell_type, index_type, summation_type, value_type>::write(const value_type *value)
 {
     return this->write(value, value);
 }
 
 template<typename cell_type, typename index_type, typename summation_type, typename value_type>
-int SDM_CS1<cell_type, index_type, summation_type, value_type>::write(const value_type *value, const value_type *address)
+int SDM_CS2_S2<cell_type, index_type, summation_type, value_type>::write(const value_type *value, const bool *address)
 {
     return this->write(value, address, 1.0);
 }
 
 template<typename cell_type, typename index_type, typename summation_type, typename value_type>
-int SDM_CS1<cell_type, index_type, summation_type, value_type>::write(const value_type *value, const value_type *address, double mult)
+int SDM_CS2_S2<cell_type, index_type, summation_type, value_type>::write(const value_type *value, const bool *address, double mult)
 {
     value_type* cuda_value;
     cuda_malloc(&cuda_value, M);
     cuda_memcpy_to_gpu(cuda_value, value, M);
 
-    value_type* cuda_address;
+    bool* cuda_address;
     cuda_malloc(&cuda_address, L);
     cuda_memcpy_to_gpu(cuda_address, address, L);
 
@@ -195,7 +178,7 @@ int SDM_CS1<cell_type, index_type, summation_type, value_type>::write(const valu
     cuda_memcpy_to_gpu(cuda_activation_counter, activation_counter, 1);
 
     kernel_decorator(
-            get_activated_cells_cs1<cell_type, index_type, summation_type, value_type>,
+            get_activated_cells<cell_type, index_type, summation_type>,
             block_count, threads_per_block, true,
             indices, bits, K, M, N, thread_count, cuda_address, cuda_activation_indices, cuda_activation_counter
     );
@@ -203,6 +186,7 @@ int SDM_CS1<cell_type, index_type, summation_type, value_type>::write(const valu
     cuda_memcpy_from_gpu(activation_counter, cuda_activation_counter, 1);
 
     int activated_cells_number = activation_counter[0];
+    //std::cout<<activated_cells_number<<",";
 
     kernel_decorator(
             write_cs1_v2<cell_type, index_type, value_type>,
@@ -221,7 +205,7 @@ int SDM_CS1<cell_type, index_type, summation_type, value_type>::write(const valu
 }
 
 template<typename cell_type, typename index_type, typename summation_type, typename value_type>
-cell_type SDM_CS1<cell_type, index_type, summation_type, value_type>::get_min_activations()
+cell_type SDM_CS2_S2<cell_type, index_type, summation_type, value_type>::get_min_activations()
 {
     cell_type min = 0;
 
@@ -251,7 +235,7 @@ cell_type SDM_CS1<cell_type, index_type, summation_type, value_type>::get_min_ac
 }
 
 template<typename cell_type, typename index_type, typename summation_type, typename value_type>
-cell_type SDM_CS1<cell_type, index_type, summation_type, value_type>::get_max_activations()
+cell_type SDM_CS2_S2<cell_type, index_type, summation_type, value_type>::get_max_activations()
 {
     cell_type max = 0;
 
@@ -281,7 +265,7 @@ cell_type SDM_CS1<cell_type, index_type, summation_type, value_type>::get_max_ac
 }
 
 template<typename cell_type, typename index_type, typename summation_type, typename value_type>
-long SDM_CS1<cell_type, index_type, summation_type, value_type>::get_activations_num()
+long SDM_CS2_S2<cell_type, index_type, summation_type, value_type>::get_activations_num()
 {
     long activations = 0;
 
@@ -315,7 +299,7 @@ long SDM_CS1<cell_type, index_type, summation_type, value_type>::get_activations
 }
 
 template<typename cell_type, typename index_type, typename summation_type, typename value_type>
-void SDM_CS1<cell_type, index_type, summation_type, value_type>::print_state()
+void SDM_CS2_S2<cell_type, index_type, summation_type, value_type>::print_state()
 {
     cell_type* cell = (cell_type*)malloc((M + 1) * sizeof(cell_type));
     index_type* indices_mask = (index_type*)malloc(K * sizeof(index_type));
@@ -377,4 +361,4 @@ void SDM_CS1<cell_type, index_type, summation_type, value_type>::print_state()
     free(bits_mask);
 }
 
-#endif // !sdm_cs1_cuh
+#endif // !sdm_cs2_s1_cuh

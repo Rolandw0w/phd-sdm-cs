@@ -29,6 +29,8 @@ bool* noise(const bool* value, uint length, uint error_num);
 short* noise(const short* value, uint length, uint error_num);
 short* noise(const short* value, uint length, uint error_num, int seed);
 
+char* get_time();
+
 
 template<typename T>
 void sort(T* arr, int size)
@@ -106,5 +108,20 @@ T* noise_ones(const T* array, int length, int seed = 0)
     result[swap_index] ^= 1;
 
     return result;
+}
+
+template<typename T>
+bool* get_sparse_array(std::vector<T>& ones_indices, int length)
+{
+    bool* sparse_array = (bool*) malloc(length * sizeof(bool));
+    for (int index = 0; index < length; index++)
+    {
+        sparse_array[index] = false;
+    }
+    for (auto index: ones_indices)
+    {
+        sparse_array[index] = true;
+    }
+    return sparse_array;
 }
 #endif // !utils_h

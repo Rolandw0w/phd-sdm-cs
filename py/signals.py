@@ -109,7 +109,7 @@ def get_cs1_signals(input_path: str,
     logger.info(f"Started reading {mask} CS1 signals: image_num={image_num}")
     cs1_signals = {}
     for mask_length in cs1_mask_range:
-        cs1_signal_path = os.path.join(input_path, f"cs1_signal{mask}_K_{mask_length}_I_{image_num}.csv")
+        cs1_signal_path = os.path.join(input_path, f"{mask}_K_{mask_length}_I_{image_num}.csv")
         if not os.path.isfile(cs1_signal_path):
             msg = f"File {cs1_signal_path} not found"
             raise ValueError(msg)
@@ -149,17 +149,19 @@ def calculate_cs1_signals(input_path: str,
                           image_num: int,
                           skip_indices: set,
                           write_to_disk: bool = True,
-                          mask: str = ""
+                          input_prefix: str = "",
+                          matrix_prefix: str = "",
+                          output_prefix: str = "",
                           ) -> dict:
     cs1_signal = {}
     for mask_length in cs1_mask_range:
-        logger.info(f"Starting {mask} signal restoration: mask_length={mask_length}, image_num={image_num}")
-        cs1_path = os.path.join(input_path, f"cs1{mask}_K_{mask_length}_I_{image_num}.csv")
+        logger.info(f"Starting {input_prefix} signal restoration: mask_length={mask_length}, image_num={image_num}")
+        cs1_path = os.path.join(input_path, f"{input_prefix}_K_{mask_length}_I_{image_num}.csv")
         if not os.path.isfile(cs1_path):
             msg = f"File {cs1_path} not found"
             raise ValueError(msg)
 
-        cs1_matrix_path = os.path.join(input_path, f"cs1{mask}_matrix_K_{mask_length}_I_{image_num}.csv")
+        cs1_matrix_path = os.path.join(input_path, f"{matrix_prefix}_K_{mask_length}_I_{image_num}.csv")
         if not os.path.isfile(cs1_matrix_path):
             msg = f"File {cs1_matrix_path} not found"
             raise ValueError(msg)
@@ -186,7 +188,7 @@ def calculate_cs1_signals(input_path: str,
             restored.append(cs1_restored_signal)
 
         if write_to_disk:
-            cs1_signal_path = os.path.join(input_path, f"cs1_signal{mask}_K_{mask_length}_I_{image_num}.csv")
+            cs1_signal_path = os.path.join(input_path, f"{output_prefix}_K_{mask_length}_I_{image_num}.csv")
             rows = []
             for row in restored:
                 try:
@@ -199,7 +201,7 @@ def calculate_cs1_signals(input_path: str,
                 cs1_signal_file.write(to_write)
 
         cs1_signal[mask_length] = restored
-        logger.info(f"Finished {mask} signal restoration: mask_length={mask_length}, image_num={image_num}")
+        logger.info(f"Finished {input_prefix} signal restoration: mask_length={mask_length}, image_num={image_num}")
 
     return cs1_signal
 
@@ -210,19 +212,23 @@ def calculate_cs1_signals_all(input_path: str,
                               image_nums: list,
                               skip_indices: set,
                               write_to_disk: bool = True,
-                              mask: str = "cs1_signal",
+                              input_prefix: str = "",
+                              matrix_prefix: str = "",
+                              output_prefix: str = "",
                               processes: int = -1,
                               ) -> dict:
     cs1_signals_map = {}
     if processes is None:
         for image_num in image_nums:
             cs1_signals = calculate_cs1_signals(input_path, features, cs1_mask_range, image_num, skip_indices,
-                                                write_to_disk=write_to_disk, mask=mask)
+                                                write_to_disk=write_to_disk, input_prefix=input_prefix,
+                                                matrix_prefix=matrix_prefix, output_prefix=output_prefix)
             cs1_signals_map[image_num] = cs1_signals
     else:
         process_num = len(image_nums) if processes == -1 else processes
         with mp.Pool(process_num) as pool:
-            params = [(input_path, features, cs1_mask_range, image_num, skip_indices, write_to_disk, mask)
+            params = [(input_path, features, cs1_mask_range, image_num, skip_indices, write_to_disk,
+                       input_prefix, matrix_prefix, output_prefix)
                       for image_num in image_nums]
             cs1_signals_list = pool.starmap(calculate_cs1_signals, params)
             cs1_signals_map = dict(zip(image_nums, cs1_signals_list))

@@ -93,7 +93,8 @@ def process_noisy(features_path: str,
     #     features_filtered, cs1_mask_range, image_nums, set(),
     #     write_to_disk=True, mask="_noisy_2")
 
-    kanerva_metrics_path = os.path.abspath(os.path.join(os.getcwd(), "..", "metrics", "kanerva_metrics_3_features.json"))
+    kanerva_metrics_path = os.path.abspath(
+        os.path.join(os.getcwd(), "..", "metrics", "kanerva_metrics_3_features.json"))
     try:
         kanerva_metrics_map = metrics.read_metrics(kanerva_metrics_path)
     except Exception as error:
@@ -106,7 +107,8 @@ def process_noisy(features_path: str,
         kanerva_metrics_map = metrics.get_kanerva_metrics_all(kanerva_signals_map, features_filtered, image_nums)
         metrics.save_metrics(kanerva_metrics_map, kanerva_metrics_path)
 
-    jaeckel_metrics_path = os.path.abspath(os.path.join(os.getcwd(), "..", "metrics", "jaeckel_metrics_3_features.json"))
+    jaeckel_metrics_path = os.path.abspath(
+        os.path.join(os.getcwd(), "..", "metrics", "jaeckel_metrics_3_features.json"))
     try:
         jaeckel_metrics_map = metrics.read_metrics(jaeckel_metrics_path)
     except Exception as error:
@@ -117,15 +119,17 @@ def process_noisy(features_path: str,
         jaeckel_metrics_map = metrics.get_labels_metrics_all(jaeckel_signals_map, features_filtered, image_nums)
         metrics.save_metrics(jaeckel_metrics_map, jaeckel_metrics_path)
 
-    cs1_noisy_1_metrics_path = os.path.abspath(os.path.join(os.getcwd(), "..", "metrics", "cs1_noisy_1_metrics_3_features.json"))
+    cs1_noisy_1_metrics_path = os.path.abspath(
+        os.path.join(os.getcwd(), "..", "metrics", "cs1_noisy_1_metrics_3_features.json"))
     try:
         cs1_metrics_noisy_1_map = metrics.read_metrics(cs1_noisy_1_metrics_path)
     except Exception as error:
         logger.warning(f"Error while reading CS SDM (1 noisy bit) metrics: {repr(error)}")
 
         try:
-            cs1_signals_noisy_1_map = signals.get_cs1_signals_all(os.path.abspath(os.path.join(os.getcwd(), "..", "output_noisy")),
-                                                                  cs1_mask_range, image_nums, mask="_noisy")
+            cs1_signals_noisy_1_map = signals.get_cs1_signals_all(
+                os.path.abspath(os.path.join(os.getcwd(), "..", "output_noisy")),
+                cs1_mask_range, image_nums, mask="_noisy")
         except Exception as cs1_noisy_1_error:
             logger.warning(f"Error while reading CS SDM (1 noisy bit) signals: {repr(cs1_noisy_1_error)}")
 
@@ -134,19 +138,21 @@ def process_noisy(features_path: str,
                 features_filtered, cs1_mask_range, image_nums, set(),
                 write_to_disk=True, mask="_noisy"
             )
-        
+
         cs1_metrics_noisy_1_map = metrics.get_cs1_metrics_all(cs1_signals_noisy_1_map, features_filtered, image_nums)
         metrics.save_metrics(cs1_metrics_noisy_1_map, cs1_noisy_1_metrics_path)
 
-    cs1_noisy_2_metrics_path = os.path.abspath(os.path.join(os.getcwd(), "..", "metrics", "cs1_noisy_2_metrics_3_features.json"))
+    cs1_noisy_2_metrics_path = os.path.abspath(
+        os.path.join(os.getcwd(), "..", "metrics", "cs1_noisy_2_metrics_3_features.json"))
     try:
         cs1_metrics_noisy_2_map = metrics.read_metrics(cs1_noisy_2_metrics_path)
     except Exception as error:
         logger.warning(f"Error while reading CS SDM (1 noisy bit) metrics: {repr(error)}")
 
         try:
-            cs1_signals_noisy_2_map = signals.get_cs1_signals_all(os.path.abspath(os.path.join(os.getcwd(), "..", "output_noisy_2")),
-                                                                  cs1_mask_range, image_nums, mask="_noisy_2")
+            cs1_signals_noisy_2_map = signals.get_cs1_signals_all(
+                os.path.abspath(os.path.join(os.getcwd(), "..", "output_noisy_2")),
+                cs1_mask_range, image_nums, mask="_noisy_2")
         except Exception as cs1_noisy_2_error:
             logger.warning(f"Error while reading CS SDM (2 noisy bits) signals: {repr(cs1_noisy_2_error)}")
 
@@ -170,6 +176,312 @@ def process_noisy(features_path: str,
                                      cs1_metrics_noisy_1_map, cs1_metrics_noisy_2_map,
                                      1, 2, 12, 12, image_nums_actual=[image_nums_actual[i] for i in range(1, 18, 3)])
     print()
+
+
+def process_cs2_naive(features_path: str,
+                      input_path: str,
+                      labels_mask_length: int,
+                      image_nums: list,
+                      plots_path: str,
+                      cs1_mask_range: list,
+                      labels_mask_range: list,
+                      multi_process: bool = False):
+    features = dw.get_features(features_path)
+    skip_indices = set()
+    # for index in range(features.shape[1]):
+    #     feature_array = features[:, index]
+    #     m = feature_array.max()
+    #     if m == 0:
+    #         skip_indices.add(index)
+    delete_list = []
+    features_filtered = np.delete(features, delete_list, axis=1)
+
+    kanerva_metrics_path = os.path.abspath(os.path.join(os.getcwd(), "..", "metrics", "kanerva_metrics_.json"))
+    try:
+        kanerva_metrics_map = metrics.read_metrics(kanerva_metrics_path)
+    except Exception as error:
+        logger.warning(f"Error while reading Kanerva metrics: {repr(error)}")
+
+        kanerva_radius_list = [1, 2, 3, 4, 5, 6]
+        kanerva_p0s = ["0.990", "0.995"]
+        kanerva_signals_map = signals.get_kanerva_signals_all(input_path, kanerva_radius_list, kanerva_p0s, image_nums,
+                                                              delete_list=delete_list)
+        kanerva_metrics_map = metrics.get_kanerva_metrics_all(kanerva_signals_map, features_filtered, image_nums)
+        metrics.save_metrics(kanerva_metrics_map, kanerva_metrics_path)
+
+    jaeckel_metrics_path = os.path.abspath(os.path.join(os.getcwd(), "..", "metrics", "jaeckel_metrics.json"))
+    try:
+        jaeckel_metrics_map = metrics.read_metrics(jaeckel_metrics_path)
+    except Exception as error:
+        logger.warning(f"Error while reading Jaeckel metrics: {repr(error)}")
+
+        jaeckel_signals_map = signals.get_labels_signals_all(input_path, labels_mask_range, image_nums,
+                                                             delete_list=delete_list)
+        jaeckel_metrics_map = metrics.get_labels_metrics_all(jaeckel_signals_map, features_filtered, image_nums)
+        metrics.save_metrics(jaeckel_metrics_map, jaeckel_metrics_path)
+
+    cs2_naive_metrics_path = os.path.abspath(os.path.join(os.getcwd(), "..", "metrics", "cs2_naive_metrics.json"))
+    try:
+        cs2_metrics_naive_map = metrics.read_metrics(cs2_naive_metrics_path)
+    except Exception as error:
+        logger.warning(f"Error while reading CS2 SDM naive metrics: {repr(error)}")
+
+        try:
+            cs2_metrics_naive_map = signals.get_cs1_signals_all(
+                os.path.abspath(os.path.join(os.getcwd(), "..", "output")),
+                [1, 2, 3, 4, 5], image_nums, mask="cs2_naive_signal")
+        except Exception as cs1_noisy_1_error:
+            logger.warning(f"Error while reading CS2 SDM naive signals: {repr(cs1_noisy_1_error)}")
+
+            cs2_metrics_naive_map = signals.calculate_cs1_signals_all(
+                os.path.abspath(os.path.join(os.getcwd(), "..", "output")),
+                features_filtered, [1, 2, 3, 4, 5], image_nums, set(),
+                write_to_disk=True, input_prefix="cs2_naive", matrix_prefix="cs2_matrix",
+                output_prefix="cs2_naive_signal",
+            )
+
+        cs2_metrics_naive_map = metrics.get_cs1_metrics_all(cs2_metrics_naive_map, features_filtered, image_nums)
+        metrics.save_metrics(cs2_metrics_naive_map, cs2_naive_metrics_path)
+
+    plots.plot_cs2_naive(plots_path, cs2_metrics_naive_map, [1, 2, 3, 4, 5], image_nums)
+    plots.plot_cs2_naive_comparison(plots_path, image_nums,
+                                    kanerva_metrics_map, jaeckel_metrics_map, cs2_metrics_naive_map,
+                                    1, 2, 3)
+    print()
+
+
+def process_cs2_noisy_1(features_path: str,
+                        input_path: str,
+                        labels_mask_length: int,
+                        image_nums: list,
+                        plots_path: str,
+                        cs1_mask_range: list,
+                        labels_mask_range: list,
+                        multi_process: bool = False,
+                        ):
+    features = dw.get_features(features_path)
+
+    less_than_4_indices = set()
+
+    image_nums_cp = image_nums.copy()
+    image_nums_actual = []
+    for index in range(features.shape[1]):
+        if index == image_nums_cp[0]:
+            image_nums_actual.append(image_nums_cp[0] - len(less_than_4_indices))
+            del image_nums_cp[0]
+
+        feature_array = features[:, index]
+        non_zero = feature_array.nonzero()
+        non_zero_count = non_zero[0].shape[0]
+        if non_zero_count < 4:
+            less_than_4_indices.add(index)
+    image_nums_actual.append(image_nums_cp[0] - len(less_than_4_indices))
+    delete_list = sorted(list(less_than_4_indices))
+    features_filtered = np.delete(features, delete_list, axis=1)
+
+    kanerva_metrics_path = os.path.abspath(
+        os.path.join(os.getcwd(), "..", "metrics", "kanerva_metrics_4_features.json"))
+    try:
+        kanerva_metrics_map = metrics.read_metrics(kanerva_metrics_path)
+    except Exception as error:
+        logger.warning(f"Error while reading Kanerva metrics: {repr(error)}")
+
+        kanerva_radius_list = [1, 2, 3, 4, 5, 6]
+        kanerva_p0s = ["0.990", "0.995"]
+        kanerva_signals_map = signals.get_kanerva_signals_all(input_path, kanerva_radius_list, kanerva_p0s, image_nums,
+                                                              delete_list=delete_list)
+        kanerva_metrics_map = metrics.get_kanerva_metrics_all(kanerva_signals_map, features_filtered, image_nums)
+        metrics.save_metrics(kanerva_metrics_map, kanerva_metrics_path)
+
+    jaeckel_metrics_path = os.path.abspath(
+        os.path.join(os.getcwd(), "..", "metrics", "jaeckel_metrics_4_features.json"))
+    try:
+        jaeckel_metrics_map = metrics.read_metrics(jaeckel_metrics_path)
+    except Exception as error:
+        logger.warning(f"Error while reading Jaeckel metrics: {repr(error)}")
+
+        jaeckel_signals_map = signals.get_labels_signals_all(input_path, labels_mask_range, image_nums,
+                                                             delete_list=delete_list)
+        jaeckel_metrics_map = metrics.get_labels_metrics_all(jaeckel_signals_map, features_filtered, image_nums)
+        metrics.save_metrics(jaeckel_metrics_map, jaeckel_metrics_path)
+
+    cs2_noisy_1_metrics_path = os.path.abspath(
+        os.path.join(os.getcwd(), "..", "metrics", "cs2_noisy_1_metrics_4_features.json"))
+    try:
+        cs2_metrics_noisy_1_map = metrics.read_metrics(cs2_noisy_1_metrics_path)
+    except Exception as error:
+        logger.warning(f"Error while reading CS2 SDM (1 noisy bit) metrics: {repr(error)}")
+
+        try:
+            cs2_signals_noisy_1_map = signals.get_cs1_signals_all(
+                os.path.abspath(os.path.join(os.getcwd(), "..", "output")),
+                cs1_mask_range, image_nums, mask="_noisy")
+        except Exception as cs1_noisy_1_error:
+            logger.warning(f"Error while reading CS2 SDM (1 noisy bit) signals: {repr(cs1_noisy_1_error)}")
+
+            cs2_signals_noisy_1_map = signals.calculate_cs1_signals_all(
+                os.path.abspath(os.path.join(os.getcwd(), "..", "output")),
+                features_filtered, cs1_mask_range, image_nums, set(),
+                write_to_disk=True, input_prefix="cs2_noisy_1", matrix_prefix="cs2_noisy_1_matrix", output_prefix="cs2_noisy_1_signal"
+            )
+
+        cs2_metrics_noisy_1_map = metrics.get_cs1_metrics_all(cs2_signals_noisy_1_map, features_filtered, image_nums)
+        metrics.save_metrics(cs2_metrics_noisy_1_map, cs2_noisy_1_metrics_path)
+
+    cs2_noisy_2_metrics_path = os.path.abspath(
+        os.path.join(os.getcwd(), "..", "metrics", "cs2_noisy_2_metrics_4_features.json"))
+    try:
+        cs2_metrics_noisy_2_map = metrics.read_metrics(cs2_noisy_2_metrics_path)
+    except Exception as error:
+        logger.warning(f"Error while reading CS2 SDM (2 noisy bits) metrics: {repr(error)}")
+
+        try:
+            cs2_signals_noisy_2_map = signals.get_cs1_signals_all(
+                os.path.abspath(os.path.join(os.getcwd(), "..", "output")),
+                cs1_mask_range, image_nums, mask="_noisy")
+        except Exception as cs1_noisy_2_error:
+            logger.warning(f"Error while reading CS2 SDM (2 noisy bits) signals: {repr(cs1_noisy_2_error)}")
+
+            cs2_signals_noisy_2_map = signals.calculate_cs1_signals_all(
+                os.path.abspath(os.path.join(os.getcwd(), "..", "output")),
+                features_filtered, cs1_mask_range, image_nums, set(),
+                write_to_disk=True, input_prefix="cs2_noisy_2", matrix_prefix="cs2_noisy_2_matrix", output_prefix="cs2_noisy_2_signal"
+            )
+
+        cs2_metrics_noisy_2_map = metrics.get_cs1_metrics_all(cs2_signals_noisy_2_map, features_filtered, image_nums)
+        metrics.save_metrics(cs2_metrics_noisy_2_map, cs2_noisy_2_metrics_path)
+        
+    plots.plot_cs2_noisy_1(plots_path, image_nums,
+                           kanerva_metrics_map, jaeckel_metrics_map,
+                           cs2_metrics_noisy_1_map, cs2_metrics_noisy_2_map,
+                           1, 2, 3, 3, image_nums_actual=image_nums_actual)
+    print()
+
+
+def process_distro(plots_path: str, features_path: str):
+    features = dw.get_features(features_path)
+    plots.plot_feature_distribution(plots_path, features)
+
+
+def process_errors(plots_path: str, features_path: str):
+    features = dw.get_features(features_path)
+
+    less_than_4_indices = set()
+
+    for index in range(features.shape[1]):
+        feature_array = features[:, index]
+        non_zero = feature_array.nonzero()
+        non_zero_count = non_zero[0].shape[0]
+        if non_zero_count <= 2:
+            less_than_4_indices.add(index)
+    delete_list = sorted(list(less_than_4_indices))
+    features_filtered = np.delete(features, delete_list, axis=1)
+
+    # cs2_signals_noisy_2_map = signals.calculate_cs1_signals_all(
+    #     os.path.abspath(os.path.join(os.getcwd(), "..", "output")),
+    #     features_filtered, [3], [9_000], set(),
+    #     write_to_disk=True,
+    #     input_prefix="cs2_naive_geq_4", matrix_prefix="cs2_geq_4_matrix", output_prefix="cs2_naive_geq_4_signal"
+    # )
+
+    signals = np.genfromtxt("/home/rolandw0w/Development/PhD/output/cs2_naive_geq_4_signal_K_3_I_9000.csv", delimiter=",")
+    image_name = "err_distro_per_feat_count"
+    plots.plot_error_distro_num_features(plots_path, features_filtered, signals, image_name)
+    plots.plot_error_distribution_1(plots_path, features_filtered)
+    plots.plot_error_distribution_2(plots_path, features_filtered)
+
+
+def process_s1(plots_path: str,
+            features_path: str,
+            image_nums: list,
+            ):
+    features = dw.get_features(features_path)
+
+    less_than_4_indices = set()
+
+    for index in range(features.shape[1]):
+        feature_array = features[:, index]
+        non_zero = feature_array.nonzero()
+        non_zero_count = non_zero[0].shape[0]
+        if non_zero_count <= 2:
+            less_than_4_indices.add(index)
+    delete_list = sorted(list(less_than_4_indices))
+    features_filtered = np.delete(features, delete_list, axis=1)
+
+    cs2_noisy_2_metrics_path = os.path.abspath(
+        os.path.join(os.getcwd(), "..", "metrics", "cs2_geq_3_s1_metrics_4_features.json"))
+    try:
+        cs2_metrics_noisy_2_map = metrics.read_metrics(cs2_noisy_2_metrics_path)
+    except Exception as error:
+        logger.warning(f"Error while reading CS2 SDM (2 noisy bits) metrics: {repr(error)}")
+
+        try:
+            cs2_signals_noisy_2_map = signals.get_cs1_signals_all(
+                os.path.abspath(os.path.join(os.getcwd(), "..", "output")),
+                [3, 4, 5], image_nums, mask="_geq_3_s1")
+        except Exception as cs1_noisy_2_error:
+            logger.warning(f"Error while reading CS2 SDM (2 noisy bits) signals: {repr(cs1_noisy_2_error)}")
+
+            cs2_signals_noisy_2_map = signals.calculate_cs1_signals_all(
+                os.path.abspath(os.path.join(os.getcwd(), "..", "output")),
+                features_filtered, [3, 4, 5], image_nums, set(),
+                write_to_disk=True, input_prefix="cs2_geq_3_s1", matrix_prefix="cs2_geq_3_s1_matrix", output_prefix="cs2_geq_3_s1_signal"
+            )
+
+        cs2_metrics_noisy_2_map = metrics.get_cs1_metrics_all(cs2_signals_noisy_2_map, features_filtered, image_nums)
+        metrics.save_metrics(cs2_metrics_noisy_2_map, cs2_noisy_2_metrics_path)
+
+    sgnls = np.genfromtxt("/home/rolandw0w/Development/PhD/output/cs2_geq_3_s1_signal_K_3_I_9000.csv", delimiter=",")
+    image_name = "err_distro_per_feat_count_s1"
+    plots.plot_error_distro_num_features(plots_path, features_filtered, sgnls, image_name)
+    print(cs2_metrics_noisy_2_map)
+
+
+def process_s2(plots_path: str,
+               features_path: str,
+               image_nums: list,
+               ):
+    features = dw.get_features(features_path)
+
+    less_than_4_indices = set()
+
+    for index in range(features.shape[1]):
+        feature_array = features[:, index]
+        non_zero = feature_array.nonzero()
+        non_zero_count = non_zero[0].shape[0]
+        if non_zero_count <= 2:
+            less_than_4_indices.add(index)
+    delete_list = sorted(list(less_than_4_indices))
+    features_filtered = np.delete(features, delete_list, axis=1)
+
+    cs2_noisy_2_metrics_path = os.path.abspath(
+        os.path.join(os.getcwd(), "..", "metrics", "cs2_s2_naive_geq_3_metrics.json"))
+    try:
+        cs2_metrics_noisy_2_map = metrics.read_metrics(cs2_noisy_2_metrics_path)
+    except Exception as error:
+        logger.warning(f"Error while reading CS2 SDM (2 noisy bits) metrics: {repr(error)}")
+
+        try:
+            cs2_signals_noisy_2_map = signals.get_cs1_signals_all(
+                os.path.abspath(os.path.join(os.getcwd(), "..", "output")),
+                list(range(8, 17)), image_nums, mask="_cs2_s2_geq_3")
+        except Exception as cs1_noisy_2_error:
+            logger.warning(f"Error while reading CS2 SDM (2 noisy bits) signals: {repr(cs1_noisy_2_error)}")
+
+            cs2_signals_noisy_2_map = signals.calculate_cs1_signals_all(
+                os.path.abspath(os.path.join(os.getcwd(), "..", "output")),
+                features_filtered, list(range(8, 17)), image_nums, set(),
+                write_to_disk=True, input_prefix="cs2_s2_naive_geq_3", matrix_prefix="cs2_s2_geq_3_matrix",
+                output_prefix="cs2_s2_naive_geq3_signal"
+            )
+
+        cs2_metrics_noisy_2_map = metrics.get_cs1_metrics_all(cs2_signals_noisy_2_map, features_filtered, image_nums)
+        metrics.save_metrics(cs2_metrics_noisy_2_map, cs2_noisy_2_metrics_path)
+
+    sgnls = np.genfromtxt("/home/rolandw0w/Development/PhD/output/cs2_geq_3_s1_signal_K_3_I_9000.csv", delimiter=",")
+    image_name = "err_distro_per_feat_count_s2"
+    plots.plot_error_distro_num_features(plots_path, features_filtered, sgnls, image_name)
+    print(cs2_metrics_noisy_2_map)
 
 
 def main():
@@ -281,8 +593,34 @@ def main():
                       labels_mask_range=[1, 2, 3, 4, 5],
                       multi_process=multi_process,
                       )
+    elif args.mode == "cs2_naive":
+        process_cs2_naive(features_path, input_path,
+                          labels_mask_length,
+                          image_nums,
+                          plots_path,
+                          cs1_mask_range=cs1_mask_range,
+                          labels_mask_range=[1, 2, 3, 4, 5],
+                          multi_process=multi_process,
+                          )
+    elif args.mode == "cs2_noisy_1":
+        process_cs2_noisy_1(features_path, input_path,
+                            labels_mask_length,
+                            image_nums,
+                            plots_path,
+                            cs1_mask_range=[3],
+                            labels_mask_range=[1, 2, 3, 4, 5],
+                            multi_process=multi_process,
+                            )
+    elif args.mode == "distro":
+        process_distro(plots_path, features_path)
+    elif args.mode == "errors":
+        process_errors(plots_path, features_path)
+    elif args.mode == "s1":
+        process_s1(plots_path, features_path, image_nums)
+    elif args.mode == "s2":
+        process_s2(plots_path, features_path, image_nums)
     else:
-        msg = f"Mode should be one of [\"naive\", \"noisy\"], got {args.mode}"
+        msg = f"Mode should be one of [\"naive\", \"noisy\", \"cs2_naive\"], got {args.mode}"
         raise ValueError(msg)
 
 

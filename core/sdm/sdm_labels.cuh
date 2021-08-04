@@ -10,7 +10,7 @@ enum class ReadingType {
 
 
 template<typename cell_type, typename index_type, typename summation_type>
-struct SDM_LABELS : SDM_BASE<cell_type, index_type, summation_type>
+struct SDM_LABELS //: SDM_BASE<cell_type, index_type, summation_type>
 {
 public:
 	ulong K;
@@ -29,7 +29,8 @@ public:
 	ReadingType reading_type;
 	double bio_threshold;
 
-	SDM_LABELS(ulong K, ulong L, ulong M, ulong N, ulong block_count, ulong threads_per_block, ReadingType reading_type, double bio_threshold = 0.0);
+	SDM_LABELS(ulong K, ulong L, ulong M, ulong N, ulong block_count, ulong threads_per_block, ReadingType reading_type,
+               double bio_threshold = 0.0, index_type* mask_indices = NULL);
 	~SDM_LABELS();
 
 	bool* read(const bool* value);
@@ -39,10 +40,10 @@ public:
 	void read_stat(bool* cuda_value, summation_type* cuda_sum, int* cuda_activation_indices, int activated_cells_number, double* cuda_thresholds);
 	void read_bio(bool* cuda_value, int* cuda_activation_indices, int activated_cells_number, double* cuda_thresholds);
 
-	void write(const bool* value);
-	void write(const bool* value, int times);
-	void write(const bool* value, const bool* address);
-	void write(const bool* value, const bool* address, int times);
+	int write(const bool* value);
+    int write(const bool* value, int times);
+    int write(const bool* value, const bool* address);
+    int write(const bool* value, const bool* address, int times);
 
 	cell_type get_min_activations();
 	cell_type get_max_activations();
@@ -59,7 +60,8 @@ private:
 
 template<typename cell_type, typename index_type, typename summation_type>
 SDM_LABELS<cell_type, index_type, summation_type>::SDM_LABELS(ulong K, ulong L, ulong M, ulong N,
-	ulong block_count, ulong threads_per_block, ReadingType reading_type, double bio_threshold)
+	ulong block_count, ulong threads_per_block, ReadingType reading_type, double bio_threshold,
+	index_type* mask_indices)
 {
 	this->K = K;
 	this->L = L;
@@ -80,6 +82,8 @@ SDM_LABELS<cell_type, index_type, summation_type>::SDM_LABELS(ulong K, ulong L, 
             block_count, threads_per_block, true,
             cells, indices, K, L, M, N, thread_count
     );
+    if (mask_indices != NULL)
+        cuda_memcpy_to_gpu(indices, mask_indices, K*N);
 }
 
 template<typename cell_type, typename index_type, typename summation_type>
@@ -139,30 +143,70 @@ bool* SDM_LABELS<cell_type, index_type, summation_type>::read(const bool* value,
         return result;
     }
 
-    kernel_decorator(
-            read_jaeckel<cell_type, index_type, summation_type>,
-            block_count, threads_per_block, true,
-            cells, cuda_activation_indices, M, thread_count, cuda_sum, activated_cells_number
-    );
+    int* cuda_Ks;
+    cuda_malloc(&cuda_Ks, 1);
+
+    int* Ks = (int*)malloc(sizeof(int));
+    Ks[0] = 0;
+    cuda_memcpy_to_gpu(cuda_Ks, Ks, 1);
 
     kernel_decorator(
-            get_result<summation_type>,
-            block_count, threads_per_block, true,
-            cuda_sum, cuda_value, M, thread_count
+            sum_array_naive<bool, int>,
+            1, threads_per_block, true,
+            cuda_value, M, cuda_Ks
     );
 
-	cuda_memset(cuda_sum, 0, M);
+    cuda_memcpy_from_gpu(Ks, cuda_Ks, 1);
+
+    int K_ = Ks[0];
+    double p1 = (double)K_ / M;
+    double p0 = 1.0 - p1;
+
+    double* cuda_thresholds;
+    cuda_malloc(&cuda_thresholds, activated_cells_number);
+
+    kernel_decorator(
+            get_thresholds<cell_type>,
+            block_count, threads_per_block, true,
+            cells, cuda_activation_indices, activated_cells_number, p0, p1, M, cuda_thresholds, thread_count
+    );
+
+    switch (reading_type) {
+        case ReadingType::STATISTICAL:
+            read_stat(cuda_value, cuda_sum, cuda_activation_indices, activated_cells_number, cuda_thresholds);
+            break;
+        case ReadingType::BIOLOGICAL:
+            read_bio(cuda_value, cuda_activation_indices, activated_cells_number, cuda_thresholds);
+            break;
+    }
+
+//    kernel_decorator(
+//            read_jaeckel<cell_type, index_type, summation_type>,
+//            block_count, threads_per_block, true,
+//            cells, cuda_activation_indices, M, thread_count, cuda_sum, activated_cells_number
+//    );
+//
+//    kernel_decorator(
+//            get_result<summation_type>,
+//            block_count, threads_per_block, true,
+//            cuda_sum, cuda_value, M, thread_count, bio_threshold
+//    );
+
+	//cuda_memset(cuda_sum, 0, M);
 
     bool* result = (bool*)malloc(M * sizeof(bool));
 	cuda_memcpy_from_gpu(result, cuda_value, M);
 
 	free(activation_counter);
+	free(Ks);
 
     cuda_free(cuda_activation_counter);
     cuda_free(cuda_address);
     cuda_free(cuda_activation_indices);
     cuda_free(cuda_sum);
     cuda_free(cuda_value);
+    cuda_free(cuda_thresholds);
+    cuda_free(cuda_Ks);
 
 	return result;
 }
@@ -318,25 +362,25 @@ void SDM_LABELS<cell_type, index_type, summation_type>::read_bio(bool* cuda_valu
 }
 
 template<typename cell_type, typename index_type, typename summation_type>
-void SDM_LABELS<cell_type, index_type, summation_type>::write(const bool* value)
+int SDM_LABELS<cell_type, index_type, summation_type>::write(const bool* value)
 {
-	this->write(value, 1);
+    return this->write(value, 1);
 }
 
 template<typename cell_type, typename index_type, typename summation_type>
-void SDM_LABELS<cell_type, index_type, summation_type>::write(const bool* value, const int times)
+int SDM_LABELS<cell_type, index_type, summation_type>::write(const bool* value, const int times)
 {
-	this->write(value, value, times);
+    return this->write(value, value, times);
 }
 
 template<typename cell_type, typename index_type, typename summation_type>
-void SDM_LABELS<cell_type, index_type, summation_type>::write(const bool* value, const bool* address)
+int SDM_LABELS<cell_type, index_type, summation_type>::write(const bool* value, const bool* address)
 {
-	this->write(value, address, 1);
+    return this->write(value, address, 1);
 }
 
 template<typename cell_type, typename index_type, typename summation_type>
-void SDM_LABELS<cell_type, index_type, summation_type>::write(const bool* value, const bool* address, const int times)
+int SDM_LABELS<cell_type, index_type, summation_type>::write(const bool* value, const bool* address, const int times)
 {
 
 	bool* cuda_value;
@@ -368,7 +412,11 @@ void SDM_LABELS<cell_type, index_type, summation_type>::write(const bool* value,
 
 	if (activated_cells_number == 0)
 	{
-
+        cuda_free(cuda_value);
+        cuda_free(cuda_address);
+        cuda_free(cuda_activation_indices);
+        cuda_free(cuda_activation_counter);
+        return 0;
 	}
 	else
 	{
@@ -396,6 +444,8 @@ void SDM_LABELS<cell_type, index_type, summation_type>::write(const bool* value,
     cuda_free(cuda_activation_indices);
     cuda_free(cuda_address);
     cuda_free(cuda_value);
+
+    return activated_cells_number;
 }
 
 template<typename cell_type, typename index_type, typename summation_type>

@@ -29,7 +29,17 @@ add_executable(
         core/utils/utils.hpp
         core/runners/cs1_runner.cuh
         core/runners/cs1_runner.cu
-        core/cuda/functions.cuh core/sdm/sdm_cs1.cuh core/sdm/sdm_kanerva.cuh core/runners/kanerva_runner.cuh core/runners/kanerva_runner.cu)
+        core/runners/cs2_runner.cuh
+        core/runners/cs2_runner.cu
+        core/cuda/functions.cuh
+        core/sdm/sdm_cs1.cuh
+        core/sdm/sdm_cs2.cuh
+        core/sdm/sdm_kanerva.cuh
+        core/runners/kanerva_runner.cuh
+        core/runners/kanerva_runner.cu
+        core/sdm/sdm_cs2_s2.cuh core/runners/cs2_s2_runner.cu core/runners/cs2_s2_runner.cuh core/runners/synth_runner.cu core/runners/synth_runner.cuh)
+
+set_property(TARGET sdm_cs PROPERTY CUDA_ARCHITECTURES 72)
 
 set_source_files_properties(core/data_ops/data_reader.cpp PROPERTIES LANGUAGE CUDA)
 set_source_files_properties(core/data_ops/data_writer.cpp PROPERTIES LANGUAGE CUDA)
