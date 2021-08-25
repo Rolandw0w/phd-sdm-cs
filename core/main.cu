@@ -914,7 +914,7 @@ void cs2_s2_naive_geq_3()
 void synth_jaeckel()
 {
     Runners::SynthRunnerParameters* synth_parameters = get_synth_parameters();
-    uint num_ones_arr[] = {4, 5, 6, 7, 8, 9, 10};
+    uint num_ones_arr[] = {10, 4, 5, 6, 7, 8, 9};
 
     std::vector<report_map> reports;
     for (auto num_ones: num_ones_arr)
@@ -935,6 +935,35 @@ void synth_jaeckel()
     save_report_vector_json(&reports, synth_jaeckel_file);
 
     synth_jaeckel_file.close();
+    delete(synth_parameters);
+}
+
+void synth_kanerva()
+{
+    Runners::SynthRunnerParameters* synth_parameters = get_synth_parameters();
+    uint num_ones_arr[] = {4, 5, 6, 7, 8, 9, 10};
+
+    std::vector<report_map> reports;
+    for (auto num_ones: num_ones_arr)
+    {
+        Runners::SynthRunner synth_runner{};
+
+        synth_parameters->num_ones = num_ones;
+        synth_parameters->mask_length = 7;
+        synth_parameters->cells_count = 8 * 1000 * 1000;
+
+        synth_runner.set_parameters(synth_parameters);
+
+        report_map kanerva_report = synth_runner.kanerva(data_root, output_root);
+        reports.push_back(kanerva_report);
+        print_report(&kanerva_report);
+    }
+
+    std::ofstream synth_kanerva_file;
+    synth_kanerva_file.open(reports_root + "/synth_kanerva.txt");
+    save_report_vector_json(&reports, synth_kanerva_file);
+
+    synth_kanerva_file.close();
     delete(synth_parameters);
 }
 
@@ -1184,6 +1213,178 @@ void synth_cs_conf4()
     delete(synth_parameters);
 }
 
+void nat_kanerva()
+{
+    Runners::SynthRunnerParameters* synth_parameters = get_synth_parameters();
+
+    std::vector<report_map> reports;
+    Runners::SynthRunner synth_runner{};
+
+    synth_parameters->mask_length = 7;
+    synth_parameters->cells_count = 8 * 1000 * 1000;
+    synth_parameters->step = 250;
+    synth_parameters->max_arrays = 5000;
+
+    synth_runner.set_parameters(synth_parameters);
+
+    report_map kanerva_report = synth_runner.kanerva_nat(data_root, output_root);
+    reports.push_back(kanerva_report);
+    print_report(&kanerva_report);
+
+    std::ofstream synth_kanerva_file;
+    synth_kanerva_file.open(reports_root + "/nat_kanerva.txt");
+    save_report_vector_json(&reports, synth_kanerva_file);
+
+    synth_kanerva_file.close();
+    delete(synth_parameters);
+}
+
+void nat_jaeckel()
+{
+    Runners::SynthRunnerParameters* synth_parameters = get_synth_parameters();
+
+    std::vector<report_map> reports;
+    Runners::SynthRunner synth_runner{};
+
+    synth_parameters->mask_length = 3;
+    synth_parameters->cells_count = 8 * 1000 * 1000;
+    synth_parameters->step = 250;
+    synth_parameters->max_arrays = 5000;
+
+    synth_runner.set_parameters(synth_parameters);
+
+    report_map kanerva_report = synth_runner.jaeckel_nat(data_root, output_root);
+    reports.push_back(kanerva_report);
+    print_report(&kanerva_report);
+
+    std::ofstream synth_kanerva_file;
+    synth_kanerva_file.open(reports_root + "/nat_jaeckel.txt");
+    save_report_vector_json(&reports, synth_kanerva_file);
+
+    synth_kanerva_file.close();
+    delete(synth_parameters);
+}
+
+void nat_cs()
+{
+    Runners::SynthRunnerParameters* synth_parameters = get_synth_parameters();
+    uint mask_lengths[] = {3};
+
+    std::vector<std::pair<int, int>> pairs = {{150, 28}};//{{100, 36}, {75, 45}, {60, 52}};
+
+    std::vector<report_map> reports;
+    for (auto mask_length: mask_lengths)
+    {
+        for (auto pair: pairs)
+        {
+            auto cells_count = pair.second;
+            auto m = pair.first;
+
+            Runners::SynthRunner synth_runner{};
+
+            synth_parameters->mask_length = mask_length;
+            synth_parameters->value_length = m;
+            synth_parameters->address_length = 600;
+            synth_parameters->cells_count = cells_count*1000*1000;
+            synth_parameters->max_arrays = 5000;
+            synth_parameters->step = 250;
+
+            synth_runner.set_parameters(synth_parameters);
+
+            report_map jaeckel_report = synth_runner.cs_nat(data_root, output_root);
+            reports.push_back(jaeckel_report);
+            print_report(&jaeckel_report);
+        }
+    }
+
+    std::ofstream synth_jaeckel_file;
+    synth_jaeckel_file.open(reports_root + "/nat_cs.txt");
+    save_report_vector_json(&reports, synth_jaeckel_file);
+
+    synth_jaeckel_file.close();
+    delete(synth_parameters);
+}
+
+void nat_cs3()
+{
+    Runners::SynthRunnerParameters* synth_parameters = get_synth_parameters();
+    uint mask_lengths[] = {8, 10, 12, 14, 16};//
+
+    std::vector<std::pair<int, int>> pairs = {{100, 36}};//{{100, 36}, {75, 45}, {60, 52}};
+
+    std::vector<report_map> reports;
+    for (auto mask_length: mask_lengths)
+    {
+        for (auto pair: pairs)
+        {
+            auto cells_count = pair.second;
+            auto m = pair.first;
+
+            Runners::SynthRunner synth_runner{};
+
+            synth_parameters->mask_length = mask_length;
+            synth_parameters->value_length = m;
+            synth_parameters->address_length = 600;
+            synth_parameters->cells_count = cells_count*1000*1000;
+            synth_parameters->max_arrays = 5000;
+            synth_parameters->step = 250;
+
+            synth_runner.set_parameters(synth_parameters);
+
+            report_map jaeckel_report = synth_runner.cs3_nat(data_root, output_root);
+            reports.push_back(jaeckel_report);
+            print_report(&jaeckel_report);
+        }
+    }
+
+    std::ofstream synth_jaeckel_file;
+    synth_jaeckel_file.open(reports_root + "/nat_cs3.txt");
+    save_report_vector_json(&reports, synth_jaeckel_file);
+
+    synth_jaeckel_file.close();
+    delete(synth_parameters);
+}
+
+void nat_cs_balanced_impact()
+{
+    Runners::SynthRunnerParameters* synth_parameters = get_synth_parameters();
+    uint mask_lengths[] = {3};
+
+    std::vector<std::pair<int, int>> pairs = {{150, 28}};//{{100, 36}, {75, 45}, {60, 52}};
+
+    std::vector<report_map> reports;
+    for (auto mask_length: mask_lengths)
+    {
+        for (auto pair: pairs)
+        {
+            auto cells_count = pair.second;
+            auto m = pair.first;
+
+            Runners::SynthRunner synth_runner{};
+
+            synth_parameters->mask_length = mask_length;
+            synth_parameters->value_length = m;
+            synth_parameters->address_length = 600;
+            synth_parameters->cells_count = cells_count*1000*1000;
+            synth_parameters->max_arrays = 5000;
+            synth_parameters->step = 250;
+
+            synth_runner.set_parameters(synth_parameters);
+
+            report_map jaeckel_report = synth_runner.cs_nat_balanced_impact(data_root, output_root);
+            reports.push_back(jaeckel_report);
+            print_report(&jaeckel_report);
+        }
+    }
+
+    std::ofstream synth_jaeckel_file;
+    synth_jaeckel_file.open(reports_root + "/nat_cs_balanced_impact.txt");
+    save_report_vector_json(&reports, synth_jaeckel_file);
+
+    synth_jaeckel_file.close();
+    delete(synth_parameters);
+}
+
 
 int main(int argc, char** argv)
 {
@@ -1196,8 +1397,8 @@ int main(int argc, char** argv)
     output_root = argv[3];
     std::string experiment_num = argv[4];
     int experiment_num_int = std::stoi(experiment_num);
-    if (experiment_num_int < 1 || experiment_num_int > 20)
-        throw std::invalid_argument("Only {1,...,20} experiments are available now");
+    if (experiment_num_int < 1 || experiment_num_int > 26)
+        throw std::invalid_argument("Only {1,...,26} experiments are available now");
 
     typedef std::pair < std::string, std::function<void(void)>> test_type;
     std::vector<test_type> tests;
@@ -1295,6 +1496,30 @@ int main(int argc, char** argv)
     if (experiment_num_int == 20)
     {
         tests.emplace_back( "CS config 4 synth", synth_cs_conf4 );
+    }
+    if (experiment_num_int == 21)
+    {
+        tests.emplace_back( "Kanerva synth", synth_kanerva );
+    }
+    if (experiment_num_int == 22)
+    {
+        tests.emplace_back( "Kanerva natural", nat_kanerva );
+    }
+    if (experiment_num_int == 23)
+    {
+        tests.emplace_back( "Jaeckel natural", nat_jaeckel );
+    }
+    if (experiment_num_int == 24)
+    {
+        tests.emplace_back( "CS natural", nat_cs );
+    }
+    if (experiment_num_int == 25)
+    {
+        tests.emplace_back( "CS natural balanced impact", nat_cs_balanced_impact );
+    }
+    if (experiment_num_int == 26)
+    {
+        tests.emplace_back( "CS3 natural", nat_cs3 );
     }
 
     std::cout.precision(6);

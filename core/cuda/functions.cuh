@@ -17,7 +17,7 @@
 #ifdef DEBUG
 #define DEFAULT_SYNCHRONIZE_DEVICE true
 #else
-#define DEFAULT_SYNCHRONIZE_DEVICE false
+#define DEFAULT_SYNCHRONIZE_DEVICE true
 #endif
 
 

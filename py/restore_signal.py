@@ -9,12 +9,12 @@ from time import time
 def restore_cs1_signal(non_zero_features, sdm_signal, transformation, restoration_type="omp",
                        error_handler=print, **kwargs) -> np.ndarray:
     try:
-        if non_zero_features:
+        if isinstance(non_zero_features, tuple):
             len_non_zero_features = len(non_zero_features[0])
             if len_non_zero_features == 0:
                 raise ValueError("No features in array")
-        else:
-            len_non_zero_features = None
+        elif isinstance(non_zero_features, int):
+            len_non_zero_features = non_zero_features
 
         set_sdm_signal = set(sdm_signal)
         if set_sdm_signal == {0}:
@@ -24,30 +24,25 @@ def restore_cs1_signal(non_zero_features, sdm_signal, transformation, restoratio
                 matrix = transformation.copy().astype(np.float64)
                 arr = np.array(sdm_signal.copy())
 
-                omp = OrthogonalMatchingPursuit(n_nonzero_coefs=4, **kwargs)
+                omp = OrthogonalMatchingPursuit(n_nonzero_coefs=len_non_zero_features)
                 omp.fit(matrix, arr)
 
-                inds = omp.coef_.argsort()[-4:][::-1]
+                inds = omp.coef_.argsort()[-len_non_zero_features:][::-1]
                 cs1_signal = np.zeros((transformation.shape[1],)).astype(int)
                 cs1_signal[inds] = 1
-
-                omp2 = orthogonal_mp(matrix, arr, n_nonzero_coefs=4, **kwargs)
-                inds2 = omp2.argsort()[-4:][::-1]
-                cs1_signal2 = np.zeros((transformation.shape[1],)).astype(int)
-                cs1_signal2[inds2] = 1
-
-                # cs1_signal = cs1_signal2
-                for i in range(600):
-                    if cs1_signal[i] != cs1_signal2[i]:
-                        raise Exception(f"{i} {cs1_signal[i]} != {cs1_signal2[i]}")
             elif restoration_type == "linprog":
-                matrix = np.vstack([transformation.astype(int), np.ones((600,))])
-                arr = np.rint(np.append(sdm_signal, len_non_zero_features)).astype(int)
+                matrix = np.vstack([transformation.astype(int), np.ones((600,)).astype(int)])
+                # arr = np.rint(np.append(sdm_signal, len_non_zero_features)).astype(int)
+                arr = np.append(sdm_signal, len_non_zero_features)
                 method = kwargs.get("method") or "interior-point"
                 t = time()
                 solution = scipy.optimize.linprog(c=np.ones((matrix.shape[1],)), A_eq=matrix, b_eq=arr,
-                                                  method=method).x
-                inds = np.abs(solution).argsort()[-len_non_zero_features:][::-1]
+                                                  method=method)
+                solution_x = solution.x
+                if solution_x is None:
+                    solution = scipy.optimize.linprog(c=np.ones((matrix.shape[1],)), A_eq=matrix, b_eq=arr)
+                    solution_x = solution.x
+                inds = np.abs(solution_x).argsort()[-len_non_zero_features:][::-1]
                 cs1_signal = np.zeros((600,)).astype(int)
                 cs1_signal[inds] = 1
             else:

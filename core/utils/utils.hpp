@@ -69,6 +69,15 @@ T sum(T* arr, int size)
 	return s;
 }
 
+template<typename T, typename S>
+S sum2(const T* arr, int size)
+{
+    S s = 0;
+    for (int i = 0; i < size; i++)
+        s += (S) arr[i];
+    return s;
+}
+
 template<typename T>
 T mean(T* arr, int size)
 {

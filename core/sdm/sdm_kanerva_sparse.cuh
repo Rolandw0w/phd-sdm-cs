@@ -1,0 +1,237 @@
+#ifndef sdm_kanerva_sparse_cuh
+#define sdm_kanerva_sparse_cuh
+
+#include "sdm_base.cuh"
+
+
+template<typename cell_type, typename index_type, typename summation_type>
+struct SDM_KANERVA_SPARSE //: SDM_BASE<cell_type, index_type, summation_type>
+{
+public:
+    ulong d;
+    ulong K;
+    ulong L;
+    ulong M;
+    ulong N;
+
+    cell_type* cells;
+    index_type* indices;
+
+    ulong block_count;
+    ulong threads_per_block;
+    ulong thread_count;
+
+    SDM_KANERVA_SPARSE(ulong d, ulong K, ulong L, ulong M, ulong N, ulong block_count, ulong threads_per_block, index_type* mask_indices);
+    ~SDM_KANERVA_SPARSE();
+
+    bool* read(const bool* address);
+
+    ulong write(const bool *value);
+    ulong write(const bool *value, const int times);
+    ulong write(const bool *value, const bool *address);
+    ulong write(const bool *value, const bool *address, const int times);
+};
+
+template<typename cell_type, typename index_type, typename summation_type>
+SDM_KANERVA_SPARSE<cell_type, index_type, summation_type>::SDM_KANERVA_SPARSE(ulong d, ulong K, ulong L, ulong M, ulong N,
+                                                                              ulong block_count, ulong threads_per_block,
+                                                                              index_type* mask_indices)
+{
+    this->d = d;
+    this->K = K;
+    this->L = L;
+    this->M = M;
+    this->N = N;
+    this->block_count = block_count;
+    this->threads_per_block = threads_per_block;
+
+    thread_count = this->block_count * this->threads_per_block;
+
+    cuda_malloc(&indices, K * N);
+    cuda_malloc(&cells, N * (M + 1));
+
+    kernel_decorator(
+            init_labels2<cell_type, index_type>,
+            block_count, threads_per_block, true,
+            cells, indices, K, L, M, N, thread_count
+            );
+
+    if (mask_indices != NULL)
+        cuda_memcpy_to_gpu(indices, mask_indices, K*N);
+}
+
+template<typename cell_type, typename index_type, typename summation_type>
+SDM_KANERVA_SPARSE<cell_type, index_type, summation_type>::~SDM_KANERVA_SPARSE()
+{
+    cuda_free(cells);
+    cuda_free(indices);
+}
+
+template<typename cell_type, typename index_type, typename summation_type>
+bool* SDM_KANERVA_SPARSE<cell_type, index_type, summation_type>::read(const bool* address)
+{
+    index_type num_ones = sum2<bool, index_type>(address, (int) L);
+
+    int* cuda_activation_indices;
+    cuda_malloc(&cuda_activation_indices, N);
+
+    summation_type* cuda_sum;
+    cuda_malloc(&cuda_sum, M);
+    cuda_memset(cuda_sum, 0, M);
+
+    bool* cuda_result;
+    cuda_malloc(&cuda_result, M);
+
+    bool* cuda_address;
+    cuda_malloc(&cuda_address, L);
+    cuda_memcpy_to_gpu(cuda_address, address, L);
+
+    int* cuda_activation_counter;
+    cuda_malloc(&cuda_activation_counter, 1);
+
+    int* activation_counter = (int*)malloc(sizeof(int));
+    activation_counter[0] = 0;
+    cuda_memcpy_to_gpu(cuda_activation_counter, activation_counter, 1);
+
+    kernel_decorator(
+            get_activated_cells_kanerva_sparse<index_type>,
+            block_count, threads_per_block, true,
+            indices, K, N, d, thread_count, cuda_address, cuda_activation_indices, cuda_activation_counter, num_ones
+    );
+
+    cuda_memcpy_from_gpu(activation_counter, cuda_activation_counter, 1);
+    int activated_cells_number = activation_counter[0];
+    //std::cout << activated_cells_number << std::endl;
+
+    if (activated_cells_number == 0)
+    {
+        bool* result = (bool*)malloc(M * sizeof(bool));
+        memset(result, 0, M * sizeof(bool));
+
+        free(activation_counter);
+
+        cuda_free(cuda_activation_counter);
+        cuda_free(cuda_address);
+        cuda_free(cuda_activation_indices);
+        cuda_free(cuda_sum);
+        cuda_free(cuda_result);
+
+        return result;
+    }
+
+    kernel_decorator(
+            read_jaeckel<cell_type, index_type, summation_type>,
+            block_count, threads_per_block, true,
+            cells, cuda_activation_indices, M, thread_count, cuda_sum, activated_cells_number
+    );
+
+    kernel_decorator(
+            get_result<summation_type>,
+            block_count, threads_per_block, true,
+            cuda_sum, cuda_result, M, thread_count, 0.0
+    );
+
+    cuda_free(cuda_activation_counter);
+    cuda_memset(cuda_sum, 0, M);
+
+    bool* result = (bool*)malloc(M * sizeof(bool));
+    cuda_memcpy_from_gpu(result, cuda_result, M);
+
+    free(activation_counter);
+
+    cuda_free(cuda_address);
+    cuda_free(cuda_activation_indices);
+    cuda_free(cuda_result);
+    cuda_free(cuda_sum);
+
+    return result;
+}
+
+template<typename cell_type, typename index_type, typename summation_type>
+ulong SDM_KANERVA_SPARSE<cell_type, index_type, summation_type>::write(const bool *value)
+{
+    return this->write(value, 1);
+}
+
+template<typename cell_type, typename index_type, typename summation_type>
+ulong SDM_KANERVA_SPARSE<cell_type, index_type, summation_type>::write(const bool *value, const int times)
+{
+    return this->write(value, value, times);
+}
+
+template<typename cell_type, typename index_type, typename summation_type>
+ulong SDM_KANERVA_SPARSE<cell_type, index_type, summation_type>::write(const bool *value, const bool *address)
+{
+    return this->write(value, address, 1);
+}
+
+template<typename cell_type, typename index_type, typename summation_type>
+ulong SDM_KANERVA_SPARSE<cell_type, index_type, summation_type>::write(const bool *value, const bool *address, const int times)
+{
+    index_type num_ones = sum2<bool, index_type>(address, L);
+
+    bool* cuda_value;
+    cuda_malloc(&cuda_value, M);
+    cuda_memcpy_to_gpu(cuda_value, value, M);
+
+    bool* cuda_address;
+    cudaMalloc((void **)&cuda_address, L);
+    cuda_memcpy_to_gpu(cuda_address, address, L);
+
+    cell_type* cuda_to_add;
+    cuda_malloc(&cuda_to_add, M + 1);
+
+    kernel_decorator(
+            get_array_to_add<cell_type>,
+            block_count, threads_per_block, true,
+            cuda_value, cuda_to_add, M, times, thread_count
+    );
+
+    int* cuda_activation_indices;
+    cuda_malloc(&cuda_activation_indices, N);
+
+    int* cuda_activation_counter;
+    cuda_malloc(&cuda_activation_counter, 1);
+
+    int* activation_counter = (int*)malloc(sizeof(int));
+    activation_counter[0] = 0;
+    cuda_memcpy_to_gpu(cuda_activation_counter, activation_counter, 1);
+
+    kernel_decorator(
+            get_activated_cells_kanerva_sparse<index_type>,
+            block_count, threads_per_block, true,
+            indices, K, N, d, thread_count, cuda_address, cuda_activation_indices, cuda_activation_counter, num_ones
+    );
+
+    cuda_memcpy_from_gpu(activation_counter, cuda_activation_counter, 1);
+    int activated_cells_number = activation_counter[0];
+
+    if (activated_cells_number == 0)
+    {
+        free(activation_counter);
+
+        cuda_free(cuda_activation_counter);
+        cuda_free(cuda_activation_indices);
+        cuda_free(cuda_address);
+        cuda_free(cuda_to_add);
+        cuda_free(cuda_value);
+        return 0;
+    }
+
+    kernel_decorator(
+            write_jaeckel<cell_type, index_type>,
+            block_count, threads_per_block, true,
+            cells, M, thread_count, cuda_to_add, cuda_activation_indices, activated_cells_number
+    );
+
+    free(activation_counter);
+
+    cuda_free(cuda_activation_counter);
+    cuda_free(cuda_activation_indices);
+    cuda_free(cuda_address);
+    cuda_free(cuda_to_add);
+    cuda_free(cuda_value);
+
+    return activated_cells_number;
+}
+#endif // !sdm_kanerva_sparse_cuh

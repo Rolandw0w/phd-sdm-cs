@@ -87,7 +87,7 @@ void init_jaeckel_ones(cell_type* cells, index_type* indices, bool* bits, uint K
         for (uint j = 0; j < K; j++)
         {
             indices[i*K + j] = (index_type)(L * curand_uniform(&state));
-            bits[i*K + j] = 1;
+            bits[i*K + j] = true;
             //printf("%d %d %d\n", i*K + j, indices[i*K + j], bits[i*K + j]);
         }
 
@@ -232,6 +232,23 @@ void init_labels(cell_type* cells, index_type* indices, uint K, uint L, uint M, 
 	}
 }
 
+template<typename cell_type, typename index_type>
+__global__
+void init_labels2(cell_type* cells, index_type* indices, uint K, uint L, uint M, uint N, int thread_count)
+{
+    int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
+    curandState state;
+    curand_init(thread_num, 0, 0, &state);
+
+    for (long i = thread_num; i < N; i += thread_count)
+    {
+        for (uint j = 0; j < M + 1; j++)
+        {
+            cells[i * (M + 1) + j] = 0;
+        }
+    }
+}
+
 template<typename index_type>
 __device__
 bool is_activated(index_type* indices, bool* bits, int i, uint K, bool* destination_address)
@@ -362,9 +379,44 @@ void get_activated_cells_kanerva(bool* addresses, uint L, uint N, uint d,
                            int thread_count, bool* destination_address, int* activated_indices, int* counter)
 {
     int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
-    for (uint i = thread_num; i < N; i += thread_count)
+    for (int i = thread_num; i < N; i += thread_count)
     {
-        bool activated = is_activated_kanerva<uint>(addresses, destination_address, i, L, d);
+        bool activated = is_activated_kanerva<short>(addresses, destination_address, i, L, d);
+        if (activated)
+        {
+            int old = atomicAdd(&counter[0], 1);
+            activated_indices[old] = i;
+        }
+    }
+}
+
+template<typename index_type>
+__device__
+bool is_activated_kanerva_sparse(index_type* indices, bool* destination_address, uint i, uint K, uint d, int num_ones)
+{
+    index_type dist = 0;
+
+    for (int k = 0; k < K; k++)
+    {
+        index_type index = indices[i*K + k];
+        bool index_dist = !destination_address[index];
+        dist += index_dist;
+    }
+    index_type match = K - dist;
+    index_type hamming_distance = dist + (num_ones - match);
+    bool is_activated = hamming_distance <= d;
+    return is_activated;
+}
+
+template<typename index_type>
+__global__
+void get_activated_cells_kanerva_sparse(index_type* indices, uint K, uint N, uint d, int thread_count,
+                                        bool* destination_address, int* activated_indices, int* counter, int num_ones)
+{
+    int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
+    for (int i = thread_num; i < N; i += thread_count)
+    {
+        bool activated = is_activated_kanerva_sparse<index_type>(indices, destination_address, i, K, d, num_ones);
         if (activated)
         {
             int old = atomicAdd(&counter[0], 1);
@@ -391,6 +443,24 @@ void read_jaeckel(cell_type* cells, int* activated_indices, uint M, int thread_c
 		}
 		//printf("%d %d\n", thread_num, sum[thread_num]);
 	}
+}
+
+template<typename cell_type, typename index_type, typename summation_type>
+__global__
+void read_jaeckel_v2(cell_type* cells, int* activated_indices, uint M, int thread_count, summation_type* sum, int activated_cells_number)
+{
+    int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
+
+    for (int i = thread_num; i < activated_cells_number; i += thread_count)
+    {
+        long long activated_index = activated_indices[i];
+        long long cell_start = activated_index * (M + 1);
+        for (int j = 0; j < M; j++)
+        {
+            long long cell_index = cell_start + j;
+            atomicAdd(&sum[j], (summation_type) cells[cell_index]);
+        }
+    }
 }
 
 template <typename cell_type, typename sum_type>
@@ -556,6 +626,23 @@ void write_jaeckel(cell_type* cells, uint M, int thread_count, cell_type* to_add
 			}
 		}
 	}
+}
+
+template<typename cell_type, typename index_type>
+__global__
+void write_jaeckel_v2(cell_type* cells, uint M, int thread_count, cell_type* to_add, int* activated_indices, int activated_cells_number)
+{
+    int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
+
+    for (int i = thread_num; i < activated_cells_number; i += thread_count)
+    {
+        int cell_index = activated_indices[i];
+        for (int j = 0; j < M + 1; j++)
+        {
+            long long ind = cell_index * (M + 1) + j;
+            cells[ind] = cells[ind] + to_add[j];
+        }
+    }
 }
 
 template<typename cell_type, typename index_type, typename value_type>

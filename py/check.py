@@ -102,10 +102,82 @@ def _check(clean, restored, restored_noisy, n, s, sdm, N, k):
     e_p = round(100*exact/n, round_num)
     e_n_p = round(100*exact_noisy/n, round_num)
 
-    if k:
-        msg = f"{sdm} | S={s} K={k} I={n} avg_l1={avg_hammings} avg_l1_n={avg_hammings_noisy} exact_%={e_p} exact_n_%={e_n_p}"
-    else:
-        msg = f"{sdm} | S={s} I={n} avg_l1={avg_hammings} avg_l1_n={avg_hammings_noisy} exact_%={e_p} exact_n_%={e_n_p}"
+    # if k:
+    #     msg = f"{sdm} | S={s} K={k} I={n} avg_l1={avg_hammings} avg_l1_n={avg_hammings_noisy} exact_%={e_p} exact_n_%={e_n_p}"
+    # else:
+    #     msg = f"{sdm} | S={s} I={n} avg_l1={avg_hammings} avg_l1_n={avg_hammings_noisy} exact_%={e_p} exact_n_%={e_n_p}"
+
+    res = {
+        "avg_fn": avg_fn,
+        "avg_fn_noisy": avg_fn_noisy,
+        "avg_fp": avg_fp,
+        "avg_fp_noisy": avg_fp_noisy,
+        "avg_l1": avg_hammings,
+        "avg_l1_noisy": avg_hammings_noisy,
+        "arrays_count": n,
+        "cells_count": N,
+        "exact": exact,
+        "exact_noisy": exact_noisy,
+        "exact_percent": e_p,
+        "exact_noisy_percent": e_n_p,
+        "features_count": s,
+        "sdm_type": "jaeckel" if sdm == "labels" else sdm,
+        "mask_length": k,
+    }
+    # print(msg)
+    return res
+
+
+def _check_no_cache(clean, restored, restored_noisy, n, s, sdm, N, k):
+    l1s = []
+    fns = []
+    fps = []
+    exact = 0
+    l1s_noisy = []
+    fns_noisy = []
+    fps_noisy = []
+    exact_noisy = 0
+    for i in range(n):
+        clean_array = clean[i]
+        restored_array = restored[i]
+        restored_noisy_array = restored_noisy[i]
+
+        fn, fp, _, _ = perf_measure(clean_array, restored_array)
+        l1 = fn + fp
+
+        fn_noisy, fp_noisy, _, _ = perf_measure(clean_array, restored_noisy_array)
+        l1_noisy = fn_noisy + fp_noisy
+
+        if l1 == 0:
+            exact += 1
+        if l1_noisy == 0:
+            exact_noisy += 1
+
+        l1s.append(l1)
+        fns.append(fn)
+        fps.append(fp)
+
+        l1s_noisy.append(l1_noisy)
+        fns_noisy.append(fn_noisy)
+        fps_noisy.append(fp_noisy)
+
+    round_num = 3
+    avg_hammings = round(np.mean(l1s), round_num)
+    avg_hammings_noisy = round(np.mean(l1s_noisy), round_num)
+
+    avg_fp = round(np.mean(fps), round_num)
+    avg_fp_noisy = round(np.mean(fps_noisy), round_num)
+
+    avg_fn = round(np.mean(fns), round_num)
+    avg_fn_noisy = round(np.mean(fns_noisy), round_num)
+
+    e_p = round(100*exact/n, round_num)
+    e_n_p = round(100*exact_noisy/n, round_num)
+
+    # if k:
+    #     msg = f"{sdm} | S={s} K={k} I={n} avg_l1={avg_hammings} avg_l1_n={avg_hammings_noisy} exact_%={e_p} exact_n_%={e_n_p}"
+    # else:
+    #     msg = f"{sdm} | S={s} I={n} avg_l1={avg_hammings} avg_l1_n={avg_hammings_noisy} exact_%={e_p} exact_n_%={e_n_p}"
 
     res = {
         "avg_fn": avg_fn,

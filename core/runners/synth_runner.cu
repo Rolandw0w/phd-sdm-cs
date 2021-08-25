@@ -44,7 +44,7 @@ report_map Runners::SynthRunner::jaeckel(const std::string &data_path, const std
             bool* value = sparse_arrays[write_index];
 
             int acts = sdm_jaeckel.write(value, value);
-            if (acts != 0)
+            if (acts >= 0)
             {
                 indices.push_back(write_index);
                 all_indices.push_back(write_index);
@@ -65,13 +65,12 @@ report_map Runners::SynthRunner::jaeckel(const std::string &data_path, const std
                              "_I_" + std::to_string(iter*parameters->step) + ".csv");
         for (auto i: all_indices)
         {
-
             bool* value = sparse_arrays[i];
             bool* addr = (bool*) malloc(parameters->address_length * sizeof(bool));
             for (int j = 0; j < parameters->address_length; j++)
                 addr[j] = value[j];
 
-            bool* restored = sdm_jaeckel.read(value, addr);
+            bool* restored = sdm_jaeckel.read(addr);
             file_read << i << "->";
             for (int j = 0; j < parameters->value_length; j++)
             {
@@ -89,7 +88,7 @@ report_map Runners::SynthRunner::jaeckel(const std::string &data_path, const std
             addr[swap_index] = false;
 
             // read noisy
-            bool* restored_noisy = sdm_jaeckel.read(value, addr);
+            bool* restored_noisy = sdm_jaeckel.read(addr);
             file_read_noisy << i << "->";
             for (int j = 0; j < parameters->value_length; j++)
             {
@@ -214,6 +213,141 @@ report_map Runners::SynthRunner::labels(const std::string &data_path, const std:
             free(restored_noisy);
         }
         std::cout << "avg_l1=" << l1/all_indices.size() << " avg_l1_n=" << l1_n/all_indices.size() << std::endl;
+        file_read.close();
+        file_read_noisy.close();
+    }
+    for (auto sparse_array: sparse_arrays)
+    {
+        free(sparse_array);
+    }
+
+    return report;
+}
+
+
+report_map Runners::SynthRunner::kanerva(const std::string &data_path, const std::string &output_path)
+{
+    report_map report;
+    auto sparse_array_indices = read_sparse_arrays<short>(parameters->num_ones, data_path);
+
+    std::vector<bool*> sparse_arrays;
+    for (auto el: sparse_array_indices)
+    {
+        auto sparse_array = get_sparse_array(el, parameters->address_length);
+        sparse_arrays.push_back(sparse_array);
+    }
+
+    auto mask_indices = read_mask_indices<short>(parameters->num_ones, parameters->address_length, parameters->cells_count, data_path);
+
+    //    SDM_JAECKEL<short, short, int> sdm_jaeckel(parameters->mask_length, parameters->address_length, parameters->value_length, parameters->cells_count,
+    //                                               parameters->block_count, parameters->threads_per_block,
+    //                                               0.0, mask_indices=mask_indices);
+
+    int dist;
+    switch (parameters->num_ones) {
+        case 4:
+            dist = 2;
+            break;
+        case 5:
+            dist = 4;
+            break;
+        case 6:
+            dist = 6;
+            break;
+        case 7:
+            dist = 8;
+            break;
+        case 8:
+            dist = 10;
+            break;
+        case 9:
+            dist = 12;
+            break;
+        case 10:
+            dist = 14;
+            break;
+    }
+    SDM_KANERVA_SPARSE<short, short, int> sdm_kanerva(dist, parameters->num_ones, parameters->address_length,
+                                                      parameters->value_length, parameters->cells_count,
+                                                      parameters->block_count, parameters->threads_per_block, mask_indices);
+
+    free(mask_indices);
+
+    int write_index = 0;
+    std::vector<int> all_indices;
+    int iter = 0;
+    while (all_indices.size() < parameters->max_arrays)
+    {
+        iter++;
+        int zero_acts = 0;
+        std::vector<int> indices;
+
+        while (indices.size() != parameters->step)
+        {
+            bool* value = sparse_arrays[write_index];
+
+            int acts = sdm_kanerva.write(value, value);
+            if (acts >= 0)
+            {
+                indices.push_back(write_index);
+                all_indices.push_back(write_index);
+            }
+            write_index++;
+        }
+        std::cout << "s=" << parameters->num_ones << " arrays=" << iter*parameters->step <<
+        " zero_acts=" << zero_acts << " written=" << all_indices.size() << " dist=" << dist << " time=" << get_time();
+
+        std::ofstream file_read;
+        file_read.open("/home/rolandw0w/Development/PhD/output/synth/kanerva/read_S_" + std::to_string(parameters->num_ones) +
+        "_K_" + std::to_string(parameters->mask_length) +
+        "_I_" + std::to_string(iter*parameters->step) + ".csv");
+
+        std::ofstream file_read_noisy;
+        file_read_noisy.open("/home/rolandw0w/Development/PhD/output/synth/kanerva/read_noisy_S_" + std::to_string(parameters->num_ones) +
+        "_K_" + std::to_string(parameters->mask_length) +
+        "_I_" + std::to_string(iter*parameters->step) + ".csv");
+        double l1 = 0.0;
+        double l1_n = 0.0;
+        for (auto i: all_indices)
+        {
+            bool* value = sparse_arrays[i];
+            bool* addr = (bool*) malloc(parameters->address_length * sizeof(bool));
+            for (int j = 0; j < parameters->address_length; j++)
+                addr[j] = value[j];
+
+            bool* restored = sdm_kanerva.read(addr);
+            file_read << i << "->";
+            for (int j = 0; j < parameters->value_length; j++)
+            {
+                l1 += (restored[j] != value[j]);
+                auto sep = (j == parameters->value_length - 1) ? "\n" : ",";
+                file_read << restored[j] << sep;
+            }
+
+            // get noisy
+            std::mt19937 generator(i);
+            std::uniform_int_distribution<int> u_distribution(0, parameters->num_ones - 1);
+
+            int swap_swap_index = u_distribution(generator);
+            int swap_index = sparse_array_indices[i][swap_swap_index];
+
+            addr[swap_index] = false;
+
+            // read noisy
+            bool* restored_noisy = sdm_kanerva.read(addr);
+            file_read_noisy << i << "->";
+            for (int j = 0; j < parameters->value_length; j++)
+            {
+                l1_n += (restored_noisy[j] != value[j]);
+                auto sep = (j == parameters->value_length - 1) ? "\n" : ",";
+                file_read_noisy << restored_noisy[j] << sep;
+            }
+            // read noisy
+            free(addr);
+            free(restored);
+            free(restored_noisy);
+        }
+        std::cout << "avg_l1=" << l1/all_indices.size() << " avg_l1_n=" << l1_n/all_indices.size() << " time=" << get_time();;
         file_read.close();
         file_read_noisy.close();
     }
@@ -1062,6 +1196,1062 @@ report_map Runners::SynthRunner::cs_conf4(const std::string &data_path, const st
         file_read_noisy.close();
         std::cout  << "Finished reading | " <<
                    "s=" << parameters->num_ones << " coef=" << parameters->value_length/parameters->num_ones << " m=" << parameters->value_length <<
+                   " N=" << parameters->cells_count << " K=" << parameters->mask_length <<
+                   " I=" << iter*parameters->step << " wi=" << write_index << " time=" << get_time();
+    }
+
+    free(array_data);
+    free(array_data_noisy);
+    free(transformed);
+
+    for (auto arr: arrays)
+        free(arr);
+    for (auto arr: addresses)
+        free(arr);
+    for (auto arr: addresses_noisy)
+        free(arr);
+
+    return report;
+}
+
+
+report_map Runners::SynthRunner::kanerva_nat(const std::string &data_path, const std::string &output_path)
+{
+    report_map report;
+    std::string dp = data_path;
+    bool* d = get_cs1(600, 12000, dp);
+
+    int c = 0;
+
+    std::vector<std::vector<short>> sparse_array_indices;
+    std::vector<bool*> sparse_arrays;
+    for (int i = 0; i < 12000; i++)
+    {
+        int ones = 0;
+        std::vector<short> sparse_array_inds;
+        bool* sparse_array = (bool*) malloc(parameters->value_length * sizeof(bool));
+        for (short j = 0; j < (short) parameters->value_length; j += 1)
+        {
+            bool b = d[i*600 + j];
+            sparse_array[j] = b;
+
+            if (b)
+            {
+                sparse_array_inds.push_back(j);
+                ones += 1;
+            }
+        }
+        if (ones >= 4)
+        {
+            c += 1;
+            sparse_array_indices.push_back(sparse_array_inds);
+            sparse_arrays.push_back(sparse_array);
+        }
+        else {
+            free(sparse_array);
+        }
+    }
+
+    auto mask_indices = read_mask_indices<short>(parameters->mask_length, parameters->address_length, parameters->cells_count, data_path);
+
+    //    SDM_JAECKEL<short, short, int> sdm_jaeckel(parameters->mask_length, parameters->address_length, parameters->value_length, parameters->cells_count,
+    //                                               parameters->block_count, parameters->threads_per_block,
+    //                                               0.0, mask_indices=mask_indices);
+
+    int dist = 8;
+    SDM_KANERVA_SPARSE<short, short, int> sdm_kanerva(dist, parameters->mask_length, parameters->address_length,
+                                                      parameters->value_length, parameters->cells_count,
+                                                      parameters->block_count, parameters->threads_per_block, mask_indices);
+
+    free(mask_indices);
+
+    int write_index = 0;
+    std::vector<int> all_indices;
+    int iter = 0;
+    while (all_indices.size() < parameters->max_arrays)
+    {
+        iter++;
+        int zero_acts = 0;
+        std::vector<int> indices;
+
+        while (indices.size() != parameters->step)
+        {
+            bool* value = sparse_arrays[write_index];
+
+            int acts = sdm_kanerva.write(value, value);
+            if (acts >= 0)
+            {
+                indices.push_back(write_index);
+                all_indices.push_back(write_index);
+            }
+            if (acts == 0)
+                zero_acts += 1;
+            write_index++;
+        }
+        std::cout << "arrays=" << iter*parameters->step << " zero_acts=" << zero_acts <<
+                     " written=" << all_indices.size() << " dist=" << dist << " time=" << get_time();
+
+        std::ofstream file_read;
+        file_read.open("/home/rolandw0w/Development/PhD/output/synth/kanerva_nat/read_S_" + std::to_string(parameters->num_ones) +
+        "_K_" + std::to_string(parameters->mask_length) +
+        "_I_" + std::to_string(iter*parameters->step) + ".csv");
+
+        std::ofstream file_read_noisy;
+        file_read_noisy.open("/home/rolandw0w/Development/PhD/output/synth/kanerva_nat/read_noisy_S_" + std::to_string(parameters->num_ones) +
+        "_K_" + std::to_string(parameters->mask_length) +
+        "_I_" + std::to_string(iter*parameters->step) + ".csv");
+        double l1 = 0.0;
+        double l1_n = 0.0;
+        for (auto i: all_indices)
+        {
+            bool* value = sparse_arrays[i];
+            bool* addr = (bool*) malloc(parameters->address_length * sizeof(bool));
+            for (int j = 0; j < parameters->address_length; j++)
+                addr[j] = value[j];
+
+            bool* restored = sdm_kanerva.read(addr);
+            file_read << i << "->";
+            for (int j = 0; j < parameters->value_length; j++)
+            {
+                l1 += (restored[j] != value[j]);
+                auto sep = (j == parameters->value_length - 1) ? "\n" : ",";
+                file_read << restored[j] << sep;
+            }
+
+            // get noisy
+            std::mt19937 generator(i);
+            std::uniform_int_distribution<int> u_distribution(0, parameters->num_ones - 1);
+
+            int swap_swap_index = u_distribution(generator);
+            int swap_index = sparse_array_indices[i][swap_swap_index];
+
+            addr[swap_index] = false;
+
+            // read noisy
+            bool* restored_noisy = sdm_kanerva.read(addr);
+            file_read_noisy << i << "->";
+            for (int j = 0; j < parameters->value_length; j++)
+            {
+                l1_n += (restored_noisy[j] != value[j]);
+                auto sep = (j == parameters->value_length - 1) ? "\n" : ",";
+                file_read_noisy << restored_noisy[j] << sep;
+            }
+            // read noisy
+            free(addr);
+            free(restored);
+            free(restored_noisy);
+        }
+        std::cout << "avg_l1=" << l1/all_indices.size() << " avg_l1_n=" << l1_n/all_indices.size() << " time=" << get_time();;
+        file_read.close();
+        file_read_noisy.close();
+    }
+    for (auto sparse_array: sparse_arrays)
+    {
+        free(sparse_array);
+    }
+    free(d);
+
+    return report;
+}
+
+
+report_map Runners::SynthRunner::jaeckel_nat(const std::string &data_path, const std::string &output_path)
+{
+    report_map report;
+    std::string dp = data_path;
+    bool* d = get_cs1(600, 12000, dp);
+
+    int c = 0;
+
+    std::vector<std::vector<short>> sparse_array_indices;
+    std::vector<bool*> sparse_arrays;
+    for (int i = 0; i < 12000; i++)
+    {
+        int ones = 0;
+        std::vector<short> sparse_array_inds;
+        bool* sparse_array = (bool*) malloc(parameters->value_length * sizeof(bool));
+        for (short j = 0; j < (short) parameters->value_length; j += 1)
+        {
+            bool b = d[i*600 + j];
+            sparse_array[j] = b;
+
+            if (b)
+            {
+                sparse_array_inds.push_back(j);
+                ones += 1;
+            }
+        }
+        if (ones >= 4)
+        {
+            c += 1;
+            sparse_array_indices.push_back(sparse_array_inds);
+            sparse_arrays.push_back(sparse_array);
+        }
+        else {
+            free(sparse_array);
+        }
+    }
+
+    auto mask_indices = read_mask_indices<short>(parameters->mask_length, parameters->address_length, parameters->cells_count, data_path);
+
+    //    SDM_JAECKEL<short, short, int> sdm_jaeckel(parameters->mask_length, parameters->address_length, parameters->value_length, parameters->cells_count,
+    //                                               parameters->block_count, parameters->threads_per_block,
+    //                                               0.0, mask_indices=mask_indices);
+
+
+    SDM_LABELS<short, short, int> sdm_jaeckel(parameters->mask_length, parameters->address_length, parameters->value_length, parameters->cells_count,
+                                              parameters->block_count, parameters->threads_per_block, ReadingType::STATISTICAL,
+                                              0.0, mask_indices=mask_indices);
+
+    free(mask_indices);
+
+    int write_index = 0;
+    std::vector<int> all_indices;
+    int iter = 0;
+    while (all_indices.size() < parameters->max_arrays)
+    {
+        iter++;
+        int zero_acts = 0;
+        std::vector<int> indices;
+
+        while (indices.size() != parameters->step)
+        {
+            bool* value = sparse_arrays[write_index];
+
+            int acts = sdm_jaeckel.write(value, value);
+            if (acts >= 0)
+            {
+                indices.push_back(write_index);
+                all_indices.push_back(write_index);
+            }
+            if (acts == 0)
+                zero_acts += 1;
+            write_index++;
+        }
+        std::cout << "arrays=" << iter*parameters->step << " zero_acts=" << zero_acts <<
+        " written=" << all_indices.size() << " time=" << get_time();
+
+        std::ofstream file_read;
+        file_read.open("/home/rolandw0w/Development/PhD/output/synth/jaeckel_nat/read_S_" + std::to_string(parameters->num_ones) +
+        "_K_" + std::to_string(parameters->mask_length) +
+        "_I_" + std::to_string(iter*parameters->step) + ".csv");
+
+        std::ofstream file_read_noisy;
+        file_read_noisy.open("/home/rolandw0w/Development/PhD/output/synth/jaeckel_nat/read_noisy_S_" + std::to_string(parameters->num_ones) +
+        "_K_" + std::to_string(parameters->mask_length) +
+        "_I_" + std::to_string(iter*parameters->step) + ".csv");
+        double l1 = 0.0;
+        double l1_n = 0.0;
+        for (auto i: all_indices)
+        {
+            bool* value = sparse_arrays[i];
+            bool* addr = (bool*) malloc(parameters->address_length * sizeof(bool));
+            for (int j = 0; j < parameters->address_length; j++)
+                addr[j] = value[j];
+
+            bool* restored = sdm_jaeckel.read(addr);
+            file_read << i << "->";
+            for (int j = 0; j < parameters->value_length; j++)
+            {
+                l1 += (restored[j] != value[j]);
+                auto sep = (j == parameters->value_length - 1) ? "\n" : ",";
+                file_read << restored[j] << sep;
+            }
+
+            // get noisy
+            std::mt19937 generator(i);
+            std::uniform_int_distribution<int> u_distribution(0, parameters->num_ones - 1);
+
+            int swap_swap_index = u_distribution(generator);
+            int swap_index = sparse_array_indices[i][swap_swap_index];
+
+            addr[swap_index] = false;
+
+            // read noisy
+            bool* restored_noisy = sdm_jaeckel.read(addr);
+            file_read_noisy << i << "->";
+            for (int j = 0; j < parameters->value_length; j++)
+            {
+                l1_n += (restored_noisy[j] != value[j]);
+                auto sep = (j == parameters->value_length - 1) ? "\n" : ",";
+                file_read_noisy << restored_noisy[j] << sep;
+            }
+            // read noisy
+            free(addr);
+            free(restored);
+            free(restored_noisy);
+        }
+        std::cout << "avg_l1=" << l1/all_indices.size() << " avg_l1_n=" << l1_n/all_indices.size() << " time=" << get_time();;
+        file_read.close();
+        file_read_noisy.close();
+    }
+    for (auto sparse_array: sparse_arrays)
+    {
+        free(sparse_array);
+    }
+    free(d);
+
+    return report;
+}
+
+
+report_map Runners::SynthRunner::cs_nat(const std::string &data_path, const std::string &output_path)
+{
+    report_map report;
+    std::string dp = data_path;
+    bool* d = get_cs1(600, 12000, dp);
+
+    int c = 0;
+
+    std::vector<std::vector<short>> sparse_array_indices;
+    std::vector<bool*> sparse_arrays;
+    for (int i = 0; i < 12000; i++)
+    {
+        int ones = 0;
+        std::vector<short> sparse_array_inds;
+        bool* sparse_array = (bool*) malloc(parameters->address_length * sizeof(bool));
+        for (short j = 0; j < (short) parameters->address_length; j += 1)
+        {
+            bool b = d[i*600 + j];
+            sparse_array[j] = b;
+
+            if (b)
+            {
+                sparse_array_inds.push_back(j);
+                ones += 1;
+            }
+        }
+        if (ones >= 4)
+        {
+            c += 1;
+            sparse_array_indices.push_back(sparse_array_inds);
+            sparse_arrays.push_back(sparse_array);
+        }
+        else {
+            free(sparse_array);
+        }
+        if (sparse_arrays.size() == parameters->max_arrays)
+            break;
+    }
+
+    int rows = parameters->value_length;
+    int columns = parameters->address_length;
+
+    int num_to_read = 1 * parameters->max_arrays;
+
+    bool* array_data = (bool*) malloc(columns*num_to_read*sizeof(bool));
+    bool* array_data_noisy = (bool*) malloc(columns*num_to_read*sizeof(bool));
+    for (int i = 0; i < num_to_read; i++)
+    {
+        for (int j = 0; j < columns; j++)
+        {
+            array_data[i*columns + j] = sparse_arrays[i][j];
+            array_data_noisy[i*columns + j] = array_data[i*columns + j];
+        }
+    }
+
+    for (int i = 0; i < num_to_read; i++)
+    {
+        // get noisy
+        std::mt19937 generator(i);
+        const int sz = sparse_array_indices[i].size();
+        std::uniform_int_distribution<int> u_distribution(0, sz - 1);
+
+        int swap_swap_index = u_distribution(generator);
+        int swap_index = sparse_array_indices[i][swap_swap_index];
+
+        array_data_noisy[i*columns + swap_index] = false;
+    }
+
+    bool* transformation = (bool*) malloc(rows*columns*sizeof(bool));
+    bool* cuda_transformation;
+
+    cuda_malloc(&cuda_transformation, rows*columns);
+
+    kernel_decorator(
+            generate_small_random_matrix<bool>,
+            parameters->block_count, parameters->threads_per_block, true,
+            rows, columns, cuda_transformation
+            );
+
+    cuda_memcpy_from_gpu(transformation, cuda_transformation, rows*columns);
+
+    uint transformation_size = rows*num_to_read;
+
+    std::ofstream transformation_file;
+    auto transformation_file_path = output_path + "/synth/cs_nat/matrix_" + std::to_string(parameters->value_length) + ".csv";
+    transformation_file.open(transformation_file_path);
+
+    for (int i = 0; i < rows; i++)
+    {
+        for (int j = 0; j < columns; j++)
+        {
+            auto ind = i*columns + j;
+            auto el = transformation[ind];
+            int to_write = 2*el - 1;
+            auto sep = (j == columns - 1) ? "\n" : ",";
+            transformation_file << to_write << sep;
+        }
+    }
+    transformation_file.close();
+
+    typedef short SUM_TYPE;
+
+    SUM_TYPE* cuda_transformed;
+
+    cuda_malloc(&cuda_transformed, transformation_size);
+    cuda_memset(cuda_transformed, (SUM_TYPE)0, transformation_size);
+
+    auto transformed = (SUM_TYPE*) malloc(transformation_size*sizeof(SUM_TYPE));
+
+    bool* cuda_data;
+    cuda_malloc(&cuda_data, columns*num_to_read);
+    cuda_memcpy_to_gpu(cuda_data, array_data, columns*num_to_read);
+
+    uint thread_count = parameters->block_count*parameters->threads_per_block;
+    kernel_decorator(
+            mult_matrix<SUM_TYPE>,
+            parameters->block_count, parameters->threads_per_block, true,
+            cuda_transformation, cuda_data, cuda_transformed, rows, columns, num_to_read, thread_count
+            );
+
+    cuda_memcpy_from_gpu(transformed, cuda_transformed, transformation_size);
+
+    cuda_free(cuda_transformation);
+    cuda_free(cuda_transformed);
+
+    std::vector<SUM_TYPE*> arrays(num_to_read);
+
+    std::vector<bool*> addresses(num_to_read);
+    std::vector<bool*> addresses_noisy(num_to_read);
+    for (int i = 0; i < num_to_read; i++)
+    {
+        auto value = (SUM_TYPE*) malloc(rows*sizeof(SUM_TYPE));
+        for (int j = 0; j < rows; j++)
+        {
+            auto val = transformed[j*num_to_read + i];
+            value[j] = val;
+        }
+        arrays[i] = value;
+
+        auto address = (bool*) malloc(columns*sizeof(bool));
+        for (int j = 0; j < columns; j++)
+        {
+            auto val = array_data[i*columns + j];
+            address[j] = val;
+        }
+        addresses[i] = address;
+
+        auto address_noisy = (bool*) malloc(columns*sizeof(bool));
+        for (int j = 0; j < columns; j++)
+        {
+            auto val = array_data_noisy[i*columns + j];
+            address_noisy[j] = val;
+        }
+        addresses_noisy[i] = address_noisy;
+    }
+
+    auto mask_indices = read_mask_indices<short>(parameters->mask_length, parameters->address_length,
+                                                 parameters->cells_count, data_path);
+
+    SDM_CS2<short, short, short, SUM_TYPE> sdm(parameters->mask_length, parameters->address_length,
+                                               parameters->value_length, parameters->cells_count, parameters->block_count,
+                                               parameters->threads_per_block, mask_indices=mask_indices);
+
+    free(mask_indices);
+
+    int write_index = 0;
+    std::vector<int> all_indices;
+    int iter = 0;
+    while (all_indices.size() < parameters->max_arrays)
+    {
+        iter++;
+        std::vector<int> indices;
+        int zero_acts = 0;
+
+        while (indices.size() != parameters->step)
+        {
+            auto value = arrays[write_index];
+            auto address = addresses[write_index];
+
+            int acts = sdm.write(value, address);
+            if (acts >= 0)
+            {
+                indices.push_back(write_index);
+                all_indices.push_back(write_index);
+            }
+            if (acts == 0)
+                zero_acts += 1;
+            write_index++;
+        }
+        std::cout << "Finished writing |" <<
+        " zero_acts=" << zero_acts <<
+        " coef=" << parameters->value_length/parameters->num_ones <<
+        " m=" << parameters->value_length <<
+        " N=" << parameters->cells_count <<
+        " K=" << parameters->mask_length <<
+        " I=" << iter*parameters->step <<
+        " wi=" << write_index <<
+        " time=" << get_time();
+
+        std::ofstream file_read;
+        file_read.open("/home/rolandw0w/Development/PhD/output/synth/cs_nat/read_m_" + std::to_string(parameters->value_length) +
+        "_K_" + std::to_string(parameters->mask_length) +
+        "_N_" + std::to_string(parameters->cells_count) +
+        "_I_" + std::to_string(iter*parameters->step) + ".csv");
+
+        std::ofstream file_read_noisy;
+        file_read_noisy.open("/home/rolandw0w/Development/PhD/output/synth/cs_nat/read_noisy_m_" + std::to_string(parameters->value_length) +
+        "_K_" + std::to_string(parameters->mask_length) +
+        "_N_" + std::to_string(parameters->cells_count) +
+        "_I_" + std::to_string(iter*parameters->step) + ".csv");
+        for (auto i: all_indices)
+        {
+            auto address = addresses[i];
+            auto address_noisy = addresses_noisy[i];
+
+            double* restored = sdm.read(address);
+            file_read << i << "->";
+            for (int j = 0; j < parameters->value_length; j++)
+            {
+                auto sep = (j == parameters->value_length - 1) ? "\n" : ",";
+                file_read << restored[j] << sep;
+            }
+
+            // read noisy
+            double* restored_noisy = sdm.read(address_noisy);
+            file_read_noisy << i << "->";
+            for (int j = 0; j < parameters->value_length; j++)
+            {
+                auto sep = (j == parameters->value_length - 1) ? "\n" : ",";
+                file_read_noisy << restored_noisy[j] << sep;
+            }
+
+            // read noisy
+            free(restored);
+            free(restored_noisy);
+        }
+        file_read.close();
+        file_read_noisy.close();
+        std::cout  << "Finished reading | " << " coef=" << parameters->value_length/parameters->num_ones << " m=" << parameters->value_length <<
+        " N=" << parameters->cells_count << " K=" << parameters->mask_length <<
+        " I=" << iter*parameters->step << " wi=" << write_index << " time=" << get_time();
+    }
+
+    free(array_data);
+    free(array_data_noisy);
+    free(transformed);
+
+    for (auto arr: arrays)
+        free(arr);
+    for (auto arr: addresses)
+        free(arr);
+    for (auto arr: addresses_noisy)
+        free(arr);
+
+    return report;
+}
+
+
+report_map Runners::SynthRunner::cs_nat_balanced_impact(const std::string &data_path, const std::string &output_path)
+{
+    report_map report;
+    std::string dp = data_path;
+    bool* d = get_cs1(600, 12000, dp);
+
+    int c = 0;
+
+    std::vector<std::vector<short>> sparse_array_indices;
+    std::vector<bool*> sparse_arrays;
+    for (int i = 0; i < 12000; i++)
+    {
+        int ones = 0;
+        std::vector<short> sparse_array_inds;
+        bool* sparse_array = (bool*) malloc(parameters->address_length * sizeof(bool));
+        for (short j = 0; j < (short) parameters->address_length; j += 1)
+        {
+            bool b = d[i*600 + j];
+            sparse_array[j] = b;
+
+            if (b)
+            {
+                sparse_array_inds.push_back(j);
+                ones += 1;
+            }
+        }
+        if (ones >= 4)
+        {
+            c += 1;
+            sparse_array_indices.push_back(sparse_array_inds);
+            sparse_arrays.push_back(sparse_array);
+        }
+        else {
+            free(sparse_array);
+        }
+        if (sparse_arrays.size() == parameters->max_arrays)
+            break;
+    }
+
+    int rows = parameters->value_length;
+    int columns = parameters->address_length;
+
+    int num_to_read = 1 * parameters->max_arrays;
+
+    bool* array_data = (bool*) malloc(columns*num_to_read*sizeof(bool));
+    bool* array_data_noisy = (bool*) malloc(columns*num_to_read*sizeof(bool));
+    for (int i = 0; i < num_to_read; i++)
+    {
+        for (int j = 0; j < columns; j++)
+        {
+            array_data[i*columns + j] = sparse_arrays[i][j];
+            array_data_noisy[i*columns + j] = array_data[i*columns + j];
+        }
+    }
+
+    for (int i = 0; i < num_to_read; i++)
+    {
+        // get noisy
+        std::mt19937 generator(i);
+        const int sz = sparse_array_indices[i].size();
+        std::uniform_int_distribution<int> u_distribution(0, sz - 1);
+
+        int swap_swap_index = u_distribution(generator);
+        int swap_index = sparse_array_indices[i][swap_swap_index];
+
+        array_data_noisy[i*columns + swap_index] = false;
+    }
+
+    bool* transformation = (bool*) malloc(rows*columns*sizeof(bool));
+    bool* cuda_transformation;
+
+    cuda_malloc(&cuda_transformation, rows*columns);
+
+    kernel_decorator(
+            generate_small_random_matrix<bool>,
+            parameters->block_count, parameters->threads_per_block, true,
+            rows, columns, cuda_transformation
+            );
+
+    cuda_memcpy_from_gpu(transformation, cuda_transformation, rows*columns);
+
+    uint transformation_size = rows*num_to_read;
+
+    std::ofstream transformation_file;
+    auto transformation_file_path = output_path + "/synth/cs_nat_balanced_impact/matrix_" + std::to_string(parameters->value_length) + ".csv";
+    transformation_file.open(transformation_file_path);
+
+    for (int i = 0; i < rows; i++)
+    {
+        for (int j = 0; j < columns; j++)
+        {
+            auto ind = i*columns + j;
+            auto el = transformation[ind];
+            int to_write = 2*el - 1;
+            auto sep = (j == columns - 1) ? "\n" : ",";
+            transformation_file << to_write << sep;
+        }
+    }
+    transformation_file.close();
+
+    typedef short SUM_TYPE;
+
+    SUM_TYPE* cuda_transformed;
+
+    cuda_malloc(&cuda_transformed, transformation_size);
+    cuda_memset(cuda_transformed, (SUM_TYPE)0, transformation_size);
+
+    auto transformed = (SUM_TYPE*) malloc(transformation_size*sizeof(SUM_TYPE));
+
+    bool* cuda_data;
+    cuda_malloc(&cuda_data, columns*num_to_read);
+    cuda_memcpy_to_gpu(cuda_data, array_data, columns*num_to_read);
+
+    uint thread_count = parameters->block_count*parameters->threads_per_block;
+    kernel_decorator(
+            mult_matrix<SUM_TYPE>,
+            parameters->block_count, parameters->threads_per_block, true,
+            cuda_transformation, cuda_data, cuda_transformed, rows, columns, num_to_read, thread_count
+            );
+
+    cuda_memcpy_from_gpu(transformed, cuda_transformed, transformation_size);
+
+    cuda_free(cuda_transformation);
+    cuda_free(cuda_transformed);
+
+    std::vector<SUM_TYPE*> arrays(num_to_read);
+
+    std::vector<bool*> addresses(num_to_read);
+    std::vector<bool*> addresses_noisy(num_to_read);
+    for (int i = 0; i < num_to_read; i++)
+    {
+        auto value = (SUM_TYPE*) malloc(rows*sizeof(SUM_TYPE));
+        for (int j = 0; j < rows; j++)
+        {
+            auto val = transformed[j*num_to_read + i];
+            value[j] = val;
+        }
+        arrays[i] = value;
+
+        auto address = (bool*) malloc(columns*sizeof(bool));
+        for (int j = 0; j < columns; j++)
+        {
+            auto val = array_data[i*columns + j];
+            address[j] = val;
+        }
+        addresses[i] = address;
+
+        auto address_noisy = (bool*) malloc(columns*sizeof(bool));
+        for (int j = 0; j < columns; j++)
+        {
+            auto val = array_data_noisy[i*columns + j];
+            address_noisy[j] = val;
+        }
+        addresses_noisy[i] = address_noisy;
+    }
+
+    auto mask_indices = read_mask_indices<short>(parameters->mask_length, parameters->address_length,
+                                                 parameters->cells_count, data_path);
+
+    SDM_CS2<short, short, short, SUM_TYPE> sdm(parameters->mask_length, parameters->address_length,
+                                               parameters->value_length, parameters->cells_count, parameters->block_count,
+                                               parameters->threads_per_block, mask_indices=mask_indices);
+
+    free(mask_indices);
+
+    int write_index = 0;
+    std::vector<int> all_indices;
+    int iter = 0;
+    while (all_indices.size() < parameters->max_arrays)
+    {
+        iter++;
+        std::vector<int> indices;
+        int zero_acts = 0;
+
+        while (indices.size() != parameters->step)
+        {
+            auto value = arrays[write_index];
+            auto address = addresses[write_index];
+
+            int num = sum2<bool, int>(address, (int) parameters->address_length);
+            double weight = pow(num, parameters->mask_length);
+            int acts = sdm.write(value, address, weight);
+            if (acts >= 0)
+            {
+                indices.push_back(write_index);
+                all_indices.push_back(write_index);
+            }
+            if (acts == 0)
+                zero_acts += 1;
+            write_index++;
+        }
+        std::cout << "Finished writing |" <<
+        " zero_acts=" << zero_acts <<
+        " coef=" << parameters->address_length/parameters->num_ones <<
+        " m=" << parameters->value_length <<
+        " N=" << parameters->cells_count <<
+        " K=" << parameters->mask_length <<
+        " I=" << iter*parameters->step <<
+        " wi=" << write_index <<
+        " time=" << get_time();
+
+        std::ofstream file_read;
+        file_read.open("/home/rolandw0w/Development/PhD/output/synth/cs_nat_balanced_impact/read_m_" + std::to_string(parameters->value_length) +
+        "_K_" + std::to_string(parameters->mask_length) +
+        "_N_" + std::to_string(parameters->cells_count) +
+        "_I_" + std::to_string(iter*parameters->step) + ".csv");
+
+        std::ofstream file_read_noisy;
+        file_read_noisy.open("/home/rolandw0w/Development/PhD/output/synth/cs_nat_balanced_impact/read_noisy_m_" + std::to_string(parameters->value_length) +
+        "_K_" + std::to_string(parameters->mask_length) +
+        "_N_" + std::to_string(parameters->cells_count) +
+        "_I_" + std::to_string(iter*parameters->step) + ".csv");
+        for (auto i: all_indices)
+        {
+            auto address = addresses[i];
+            auto address_noisy = addresses_noisy[i];
+
+            double* restored = sdm.read(address);
+            file_read << i << "->";
+            for (int j = 0; j < parameters->value_length; j++)
+            {
+                auto sep = (j == parameters->value_length - 1) ? "\n" : ",";
+                file_read << restored[j] << sep;
+            }
+
+            // read noisy
+            double* restored_noisy = sdm.read(address_noisy);
+            file_read_noisy << i << "->";
+            for (int j = 0; j < parameters->value_length; j++)
+            {
+                auto sep = (j == parameters->value_length - 1) ? "\n" : ",";
+                file_read_noisy << restored_noisy[j] << sep;
+            }
+
+            // read noisy
+            free(restored);
+            free(restored_noisy);
+        }
+        file_read.close();
+        file_read_noisy.close();
+        std::cout  << "Finished reading | " << " coef=" << parameters->value_length/parameters->num_ones << " m=" << parameters->value_length <<
+        " N=" << parameters->cells_count << " K=" << parameters->mask_length <<
+        " I=" << iter*parameters->step << " wi=" << write_index << " time=" << get_time();
+    }
+
+    free(array_data);
+    free(array_data_noisy);
+    free(transformed);
+
+    for (auto arr: arrays)
+        free(arr);
+    for (auto arr: addresses)
+        free(arr);
+    for (auto arr: addresses_noisy)
+        free(arr);
+
+    return report;
+}
+
+
+report_map Runners::SynthRunner::cs3_nat(const std::string &data_path, const std::string &output_path)
+{
+    report_map report;
+    std::string dp = data_path;
+    bool* d = get_cs1(600, 12000, dp);
+
+    int c = 0;
+
+    std::vector<std::vector<short>> sparse_array_indices;
+    std::vector<bool*> sparse_arrays;
+    for (int i = 0; i < 12000; i++)
+    {
+        int ones = 0;
+        std::vector<short> sparse_array_inds;
+        bool* sparse_array = (bool*) malloc(parameters->address_length * sizeof(bool));
+        for (short j = 0; j < (short) parameters->address_length; j += 1)
+        {
+            bool b = d[i*600 + j];
+            sparse_array[j] = b;
+
+            if (b)
+            {
+                sparse_array_inds.push_back(j);
+                ones += 1;
+            }
+        }
+        if (ones >= 4)
+        {
+            c += 1;
+            sparse_array_indices.push_back(sparse_array_inds);
+            sparse_arrays.push_back(sparse_array);
+        }
+        else {
+            free(sparse_array);
+        }
+        if (sparse_arrays.size() == parameters->max_arrays)
+            break;
+    }
+
+    int rows = parameters->value_length;
+    int columns = parameters->address_length;
+
+    int num_to_read = 1 * parameters->max_arrays;
+
+    bool* array_data = (bool*) malloc(columns*num_to_read*sizeof(bool));
+    bool* array_data_noisy = (bool*) malloc(columns*num_to_read*sizeof(bool));
+    for (int i = 0; i < num_to_read; i++)
+    {
+        for (int j = 0; j < columns; j++)
+        {
+            array_data[i*columns + j] = sparse_arrays[i][j];
+            array_data_noisy[i*columns + j] = array_data[i*columns + j];
+        }
+    }
+
+    for (int i = 0; i < num_to_read; i++)
+    {
+        // get noisy
+        std::mt19937 generator(i);
+        const int sz = sparse_array_indices[i].size();
+        std::uniform_int_distribution<int> u_distribution(0, sz - 1);
+
+        int swap_swap_index = u_distribution(generator);
+        int swap_index = sparse_array_indices[i][swap_swap_index];
+
+        array_data_noisy[i*columns + swap_index] = false;
+    }
+
+    bool* transformation = (bool*) malloc(rows*columns*sizeof(bool));
+    bool* cuda_transformation;
+
+    cuda_malloc(&cuda_transformation, rows*columns);
+
+    kernel_decorator(
+            generate_small_random_matrix<bool>,
+            parameters->block_count, parameters->threads_per_block, true,
+            rows, columns, cuda_transformation
+    );
+
+    cuda_memcpy_from_gpu(transformation, cuda_transformation, rows*columns);
+
+    uint transformation_size = rows*num_to_read;
+
+    std::ofstream transformation_file;
+    auto transformation_file_path = output_path + "/synth/cs3_nat/matrix_" + std::to_string(parameters->value_length) + ".csv";
+    transformation_file.open(transformation_file_path);
+
+    for (int i = 0; i < rows; i++)
+    {
+        for (int j = 0; j < columns; j++)
+        {
+            auto ind = i*columns + j;
+            auto el = transformation[ind];
+            int to_write = 2*el - 1;
+            auto sep = (j == columns - 1) ? "\n" : ",";
+            transformation_file << to_write << sep;
+        }
+    }
+    transformation_file.close();
+
+    typedef short SUM_TYPE;
+
+    SUM_TYPE* cuda_transformed;
+
+    cuda_malloc(&cuda_transformed, transformation_size);
+    cuda_memset(cuda_transformed, (SUM_TYPE)0, transformation_size);
+
+    auto transformed = (SUM_TYPE*) malloc(transformation_size*sizeof(SUM_TYPE));
+
+    bool* cuda_data;
+    cuda_malloc(&cuda_data, columns*num_to_read);
+    cuda_memcpy_to_gpu(cuda_data, array_data, columns*num_to_read);
+
+    uint thread_count = parameters->block_count*parameters->threads_per_block;
+    kernel_decorator(
+            mult_matrix<SUM_TYPE>,
+            parameters->block_count, parameters->threads_per_block, true,
+            cuda_transformation, cuda_data, cuda_transformed, rows, columns, num_to_read, thread_count
+    );
+
+    cuda_memcpy_from_gpu(transformed, cuda_transformed, transformation_size);
+
+    cuda_free(cuda_transformation);
+    cuda_free(cuda_transformed);
+
+    std::vector<SUM_TYPE*> arrays(num_to_read);
+
+    std::vector<bool*> addresses(num_to_read);
+    std::vector<bool*> addresses_noisy(num_to_read);
+    for (int i = 0; i < num_to_read; i++)
+    {
+        auto value = (SUM_TYPE*) malloc(rows*sizeof(SUM_TYPE));
+        for (int j = 0; j < rows; j++)
+        {
+            auto val = transformed[j*num_to_read + i];
+            value[j] = val;
+        }
+        arrays[i] = value;
+
+        auto address = (bool*) malloc(columns*sizeof(bool));
+        for (int j = 0; j < columns; j++)
+        {
+            auto val = array_data[i*columns + j];
+            address[j] = val;
+        }
+        addresses[i] = address;
+
+        auto address_noisy = (bool*) malloc(columns*sizeof(bool));
+        for (int j = 0; j < columns; j++)
+        {
+            auto val = array_data_noisy[i*columns + j];
+            address_noisy[j] = val;
+        }
+        addresses_noisy[i] = address_noisy;
+    }
+
+    auto mask_indices = read_mask_indices<short>(parameters->mask_length, parameters->address_length,
+                                                 parameters->cells_count, data_path);
+
+    SDM_CS3<short, short, short, SUM_TYPE> sdm(parameters->mask_length, parameters->address_length,
+                                               parameters->value_length, parameters->cells_count, parameters->block_count,
+                                               parameters->threads_per_block, mask_indices=mask_indices);
+
+    free(mask_indices);
+
+    int write_index = 0;
+    std::vector<int> all_indices;
+    int iter = 0;
+    while (all_indices.size() < parameters->max_arrays)
+    {
+        iter++;
+        std::vector<int> indices;
+        int zero_acts = 0;
+
+        while (indices.size() != parameters->step)
+        {
+            auto value = arrays[write_index];
+            auto address = addresses[write_index];
+
+            int acts = sdm.write(value, address);
+            if (acts >= 0)
+            {
+                indices.push_back(write_index);
+                all_indices.push_back(write_index);
+            }
+            if (acts == 0)
+                zero_acts += 1;
+            write_index++;
+        }
+        std::cout << "Finished writing |" <<
+                  " zero_acts=" << zero_acts <<
+                  " coef=" << parameters->value_length/parameters->num_ones <<
+                  " m=" << parameters->value_length <<
+                  " N=" << parameters->cells_count <<
+                  " K=" << parameters->mask_length <<
+                  " I=" << iter*parameters->step <<
+                  " wi=" << write_index <<
+                  " time=" << get_time();
+
+        std::ofstream file_read;
+        file_read.open("/home/rolandw0w/Development/PhD/output/synth/cs3_nat/read_m_" + std::to_string(parameters->value_length) +
+                       "_K_" + std::to_string(parameters->mask_length) +
+                       "_N_" + std::to_string(parameters->cells_count) +
+                       "_I_" + std::to_string(iter*parameters->step) + ".csv");
+
+        std::ofstream file_read_noisy;
+        file_read_noisy.open("/home/rolandw0w/Development/PhD/output/synth/cs3_nat/read_noisy_m_" + std::to_string(parameters->value_length) +
+                             "_K_" + std::to_string(parameters->mask_length) +
+                             "_N_" + std::to_string(parameters->cells_count) +
+                             "_I_" + std::to_string(iter*parameters->step) + ".csv");
+        for (auto i: all_indices)
+        {
+            auto address = addresses[i];
+            auto address_noisy = addresses_noisy[i];
+
+            double* restored = sdm.read(address);
+            file_read << i << "->";
+            for (int j = 0; j < parameters->value_length; j++)
+            {
+                auto sep = (j == parameters->value_length - 1) ? "\n" : ",";
+                file_read << restored[j] << sep;
+            }
+
+            // read noisy
+            double* restored_noisy = sdm.read(address_noisy);
+            file_read_noisy << i << "->";
+            for (int j = 0; j < parameters->value_length; j++)
+            {
+                auto sep = (j == parameters->value_length - 1) ? "\n" : ",";
+                file_read_noisy << restored_noisy[j] << sep;
+            }
+
+            // read noisy
+            free(restored);
+            free(restored_noisy);
+        }
+        file_read.close();
+        file_read_noisy.close();
+        std::cout  << "Finished reading | " << " coef=" << parameters->value_length/parameters->num_ones << " m=" << parameters->value_length <<
                    " N=" << parameters->cells_count << " K=" << parameters->mask_length <<
                    " I=" << iter*parameters->step << " wi=" << write_index << " time=" << get_time();
     }

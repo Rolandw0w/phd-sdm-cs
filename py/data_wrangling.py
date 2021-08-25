@@ -1,3 +1,6 @@
+from functools import partial
+
+import math
 import numpy as np
 
 
@@ -39,3 +42,25 @@ def get_restored(path) -> np.ndarray:
         restored = [[float(x) for x in line.split(",")[:-1]] for line in content.splitlines()]
         restored_np = np.array(restored)
         return restored_np
+
+
+def round_to_odd_or_even(num: float, num_ones: int):
+    int_part = int(num)
+    # frac_part = num - int_part
+
+    if num_ones % 2 == 0:
+        if int_part % 2 == 0:
+            return int_part
+        else:
+            return int_part + int(np.sign(num))
+    if num_ones % 2 == 1:
+        if int_part % 2 == 0:
+            return int_part + int(np.sign(num))
+        else:
+            return int_part
+
+    #return round(num / 2) * 2 + (num_ones % 2)
+
+
+def round_to_odd_or_even_arr(array: np.ndarray, num_ones: int):
+    return np.vectorize(partial(round_to_odd_or_even, num_ones=num_ones))(array)

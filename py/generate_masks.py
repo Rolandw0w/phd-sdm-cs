@@ -136,38 +136,48 @@ def get_mask_indices_it(mask_length: int, addr: int, cells_count: int, seed: int
 
 
 def a(k, L, N, s):
-    with open(f"../data/masks/indices_addr_{L}_N_{N}_K_{k}_s_{s}.csv", "w") as f:
+    with open(f"../data/masks/indices_addr_{L}_N_{N}_K_{k}.csv", "w") as f:
         print(f"L={L} N={N} K={k} started")
         get_mask_indices(k, L, N, output_file=f, seed=N)
         print(f"L={L} N={N} K={k} finished")
 
 
 def main():
-    l = [
-        [4, [[16, 55], [14, 65], [12, 75], [10, 85], [8, 95], [6, 105], [4, 115]]],
-        [5, [[16, 45], [14, 51], [12, 57], [10, 63], [8, 69], [6, 75], [4, 81]]],
-        [6, [[16, 37], [14, 43], [12, 49], [10, 55], [8, 61], [6, 67], [4, 73]]],
-        [7, [[16, 32], [14, 36], [12, 40], [10, 44], [8, 48], [6, 52], [4, 56]]],
-        [8, [[16, 28], [14, 32], [12, 36], [10, 40], [8, 44], [6, 48], [4, 52]]],
-        [9, [[16, 25], [14, 27], [12, 29], [10, 31], [8, 33], [6, 35], [4, 37]]],
-        [10, [[16, 23], [14, 25], [12, 27], [10, 29], [8, 31], [6, 33], [4, 35]]],
-    ]
-    mask_lengths = [3]
     params = []
-    for mask_length in mask_lengths:
-        for num_ones, v1 in l:
-            for coef, N in v1:
-                if coef > 6:
-                    continue
-                params.append((mask_length, 600, N * 1_000_000, num_ones))
+    for k in [8, 10, 12, 14, 16]:
+        a(k, 600, 36_000_000, None)
 
-    # for param in params:
-    # a(*params[4])
-    i = 0
-    while i < len(params):
-        with mp.Pool(4) as pool:
-            pool.starmap(a, params[i:i+5])
-            i += 5
+    # for m, N in [(100, 36), (75, 45), (60, 52)]:
+    #     params.append((3, 600, N * 1_000_000, None))
+    #
+    # with mp.Pool(3) as pool:
+    #     pool.starmap(a, params)
+
+    # l = [
+    #     [4, [[16, 55], [14, 65], [12, 75], [10, 85], [8, 95], [6, 105], [4, 115]]],
+    #     [5, [[16, 45], [14, 51], [12, 57], [10, 63], [8, 69], [6, 75], [4, 81]]],
+    #     [6, [[16, 37], [14, 43], [12, 49], [10, 55], [8, 61], [6, 67], [4, 73]]],
+    #     [7, [[16, 32], [14, 36], [12, 40], [10, 44], [8, 48], [6, 52], [4, 56]]],
+    #     [8, [[16, 28], [14, 32], [12, 36], [10, 40], [8, 44], [6, 48], [4, 52]]],
+    #     [9, [[16, 25], [14, 27], [12, 29], [10, 31], [8, 33], [6, 35], [4, 37]]],
+    #     [10, [[16, 23], [14, 25], [12, 27], [10, 29], [8, 31], [6, 33], [4, 35]]],
+    # ]
+    # mask_lengths = [3]
+    # params = []
+    # for mask_length in mask_lengths:
+    #     for num_ones, v1 in l:
+    #         for coef, N in v1:
+    #             if coef > 6:
+    #                 continue
+    #             params.append((mask_length, 600, N * 1_000_000, num_ones))
+    #
+    # # for param in params:
+    # # a(*params[4])
+    # i = 0
+    # while i < len(params):
+    #     with mp.Pool(4) as pool:
+    #         pool.starmap(a, params[i:i+5])
+    #         i += 5
     # with mp.Pool(10) as pool:
     #     pool.starmap(a, [(x, 600) for x in range(6, 17)])
     # for s in [4, 5, 6, 7, 8, 9, 10]:

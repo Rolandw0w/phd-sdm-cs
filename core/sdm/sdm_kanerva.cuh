@@ -37,7 +37,8 @@ public:
 };
 
 template<typename cell_type, typename index_type, typename summation_type>
-SDM_KANERVA<cell_type, index_type, summation_type>::SDM_KANERVA(uint d, uint L, uint M, uint N, uint block_count, uint threads_per_block, double p0)
+SDM_KANERVA<cell_type, index_type, summation_type>::SDM_KANERVA(uint d, uint L, uint M, uint N, uint block_count,
+                                                                uint threads_per_block, double p0)
 {
     this->d = d;
     this->L = L;
@@ -117,6 +118,7 @@ bool* SDM_KANERVA<cell_type, index_type, summation_type>::read(const bool* value
         cuda_free(cuda_activation_indices);
         cuda_free(cuda_sum);
         cuda_free(cuda_value);
+        cuda_free(cuda_result);
 
         return result;
     }
@@ -130,7 +132,7 @@ bool* SDM_KANERVA<cell_type, index_type, summation_type>::read(const bool* value
     kernel_decorator(
             get_result<summation_type>,
             block_count, threads_per_block, true,
-            cuda_sum, cuda_value, M, thread_count, 0.0
+            cuda_sum, cuda_result, M, thread_count, 0.0
     );
 
     cuda_free(cuda_activation_counter);

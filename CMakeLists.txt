@@ -37,7 +37,7 @@ add_executable(
         core/sdm/sdm_kanerva.cuh
         core/runners/kanerva_runner.cuh
         core/runners/kanerva_runner.cu
-        core/sdm/sdm_cs2_s2.cuh core/runners/cs2_s2_runner.cu core/runners/cs2_s2_runner.cuh core/runners/synth_runner.cu core/runners/synth_runner.cuh)
+        core/sdm/sdm_cs2_s2.cuh core/runners/cs2_s2_runner.cu core/runners/cs2_s2_runner.cuh core/runners/synth_runner.cu core/runners/synth_runner.cuh core/sdm/sdm_kanerva_sparse.cuh)
 
 set_property(TARGET sdm_cs PROPERTY CUDA_ARCHITECTURES 72)
 

@@ -35,6 +35,7 @@ public:
 
 	bool* read(const bool* value);
 	bool* read(const bool* value, int iter_num);
+	bool* read(const bool* value, int iter_num, int ones);
 	bool* read(const bool* value, const bool* address);
 
 	void read_stat(bool* cuda_value, summation_type* cuda_sum, int* cuda_activation_indices, int activated_cells_number, double* cuda_thresholds);
@@ -269,7 +270,7 @@ bool* SDM_LABELS<cell_type, index_type, summation_type>::read(const bool* value,
 		Ks[0] = 0;
 		cuda_memcpy_to_gpu(cuda_Ks, Ks, 1);
 
-		sum_array<bool, int> <<<1, threads_per_block>>> (cuda_value, M, cuda_Ks);
+		sum_array_naive<bool, int> <<<1, threads_per_block>>> (cuda_value, M, cuda_Ks);
 		cuda_memcpy_from_gpu(Ks, cuda_Ks, 1);
 
 		int K_ = Ks[0];
@@ -311,6 +312,91 @@ bool* SDM_LABELS<cell_type, index_type, summation_type>::read(const bool* value,
     cuda_free(cuda_value);
 
 	return result;
+}
+
+template<typename cell_type, typename index_type, typename summation_type>
+bool* SDM_LABELS<cell_type, index_type, summation_type>::read(const bool* value, const int iter_num, int ones)
+{
+    bool* cuda_value;
+    cuda_malloc(&cuda_value, M);
+    cuda_memcpy_to_gpu(cuda_value, value, M);
+
+    int* cuda_activation_indices;
+    cuda_malloc(&cuda_activation_indices, N);
+
+    summation_type* cuda_sum;
+    cuda_malloc(&cuda_sum, M);
+
+    for (int i = 0; i < iter_num; i++)
+    {
+        int* cuda_activation_counter;
+        cuda_malloc(&cuda_activation_counter, 1);
+
+        int* activation_counter = (int*)malloc(sizeof(int));
+        activation_counter[0] = 0;
+        cuda_memcpy_to_gpu(cuda_activation_counter, activation_counter, 1);
+
+        kernel_decorator(
+                get_activated_cells_bool<cell_type, index_type, summation_type>,
+                block_count, threads_per_block, true,
+                indices, true, K, M, N, thread_count, cuda_value, cuda_activation_indices, cuda_activation_counter
+                );
+
+        cuda_memcpy_from_gpu(activation_counter, cuda_activation_counter, 1);
+        int activated_cells_number = activation_counter[0];
+
+        if (activated_cells_number == 0)
+        {
+            bool* result = (bool*)malloc(M * sizeof(bool));
+            memset(result, 0, M * sizeof(bool));
+            non_readable += 1;
+
+            free(activation_counter);
+            cuda_free(cuda_value);
+            cuda_free(cuda_activation_indices);
+            cuda_free(cuda_sum);
+            cuda_free(cuda_activation_counter);
+
+            return result;
+        }
+
+        int K_ = ones;
+        double p1 = (double)K_ / M;
+        double p0 = 1.0 - p1;
+
+        double* cuda_thresholds;
+        cuda_malloc(&cuda_thresholds, activated_cells_number);
+
+        kernel_decorator(
+                get_thresholds<cell_type>,
+                block_count, threads_per_block, true,
+                cells, cuda_activation_indices, activated_cells_number, p0, p1, M, cuda_thresholds, thread_count
+                );
+
+        switch (reading_type) {
+            case ReadingType::STATISTICAL:
+                read_stat(cuda_value, cuda_sum, cuda_activation_indices, activated_cells_number, cuda_thresholds);
+                break;
+                case ReadingType::BIOLOGICAL:
+                    read_bio(cuda_value, cuda_activation_indices, activated_cells_number, cuda_thresholds);
+                    break;
+        }
+
+        free(activation_counter);
+
+        cuda_free(cuda_activation_counter);
+        cuda_free(cuda_thresholds);
+        cuda_memset(cuda_sum, 0, M);
+    }
+
+    bool* result = (bool*)malloc(M * sizeof(bool));
+    cuda_memcpy_from_gpu(result, cuda_value, M);
+
+    cuda_free(cuda_activation_indices);
+    cuda_free(cuda_sum);
+    cuda_free(cuda_value);
+
+    return result;
 }
 
 template<typename cell_type, typename index_type, typename summation_type>
