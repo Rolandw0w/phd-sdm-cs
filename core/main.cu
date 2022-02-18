@@ -131,7 +131,7 @@ Runners::SynthRunnerParameters* get_synth_parameters()
     const uint image_read = 9000;
     const uint block_count = 64;
     const uint threads_per_block = 1024;
-    const uint mask_length = 3;
+    const uint mask_length = 4;
     const uint address_length = 600;
     const uint value_length = 600;
     const uint cells_count = 8*1000*1000;
@@ -139,9 +139,12 @@ Runners::SynthRunnerParameters* get_synth_parameters()
     const uint step = 500;
     const uint max_arrays = 25 * 1000;
 
+    std::vector<uint> knots = {100*1000};
+    //100*1000, 250*1000, 500*1000, 750*1000, 1000*1000, 1250*1000, 1500*1000, 1750*1000, 2000*1000
+
     auto* synth_parameters = new Runners::SynthRunnerParameters(image_count, image_read, block_count, threads_per_block,
                                                                 mask_length, cells_count, address_length, value_length,
-                                                                s, step, max_arrays);
+                                                                s, step, max_arrays, knots);
 
     return synth_parameters;
 }
@@ -914,7 +917,8 @@ void cs2_s2_naive_geq_3()
 void synth_jaeckel()
 {
     Runners::SynthRunnerParameters* synth_parameters = get_synth_parameters();
-    uint num_ones_arr[] = {10, 4, 5, 6, 7, 8, 9};
+    uint num_ones_arr[] = {20};
+    long long N = 15 * 1000000;
 
     std::vector<report_map> reports;
     for (auto num_ones: num_ones_arr)
@@ -922,7 +926,9 @@ void synth_jaeckel()
         Runners::SynthRunner synth_runner{};
 
         synth_parameters->num_ones = num_ones;
-
+        synth_parameters->knots = {500*1000, 1000*1000, 1500*1000, 2000*1000};
+        synth_parameters->mask_length = 5;
+        synth_parameters->cells_count = N;
         synth_runner.set_parameters(synth_parameters);
 
         report_map jaeckel_report = synth_runner.jaeckel(data_root, output_root);
@@ -941,29 +947,35 @@ void synth_jaeckel()
 void synth_kanerva()
 {
     Runners::SynthRunnerParameters* synth_parameters = get_synth_parameters();
-    uint num_ones_arr[] = {4, 5, 6, 7, 8, 9, 10};
+    uint num_ones_arr[] = {16};
+    long long N = 15 * 1000000;
+    uint K = 4;
 
     std::vector<report_map> reports;
     for (auto num_ones: num_ones_arr)
     {
-        Runners::SynthRunner synth_runner{};
+        uint radiuses[] = {num_ones - K, num_ones - K + 1};
+        for (uint radius : radiuses) {
+            Runners::SynthRunner synth_runner{};
 
-        synth_parameters->num_ones = num_ones;
-        synth_parameters->mask_length = 7;
-        synth_parameters->cells_count = 8 * 1000 * 1000;
+            synth_parameters->num_ones = num_ones;
+            synth_parameters->knots = {500*1000, 1000*1000, 1500*1000, 2000*1000};
+            synth_parameters->mask_length = K;
+            synth_parameters->cells_count = N;
+            synth_parameters->radius = radius;
+            synth_runner.set_parameters(synth_parameters);
 
-        synth_runner.set_parameters(synth_parameters);
-
-        report_map kanerva_report = synth_runner.kanerva(data_root, output_root);
-        reports.push_back(kanerva_report);
-        print_report(&kanerva_report);
+            report_map jaeckel_report = synth_runner.kanerva(data_root, output_root);
+            reports.push_back(jaeckel_report);
+            print_report(&jaeckel_report);
+        }
     }
 
-    std::ofstream synth_kanerva_file;
-    synth_kanerva_file.open(reports_root + "/synth_kanerva.txt");
-    save_report_vector_json(&reports, synth_kanerva_file);
+    std::ofstream synth_jaeckel_file;
+    synth_jaeckel_file.open(reports_root + "/synth_kanerva.txt");
+    save_report_vector_json(&reports, synth_jaeckel_file);
 
-    synth_kanerva_file.close();
+    synth_jaeckel_file.close();
     delete(synth_parameters);
 }
 
@@ -1159,17 +1171,20 @@ void synth_cs_conf3()
 void synth_cs_conf4()
 {
     Runners::SynthRunnerParameters* synth_parameters = get_synth_parameters();
-    uint mask_lengths[] = {3};
-    uint num_ones_arr[] = {4, 5, 6, 7, 8, 9, 10};
+    uint mask_lengths[] = {4};
+    uint num_ones_arr[] = {12, 16, 20};
 
     std::map<int, std::vector<std::pair<short, int>>> map = {
-//            {4,{{16, 55}, {14, 65}, {12, 75}, {10, 85}, {8, 95}, {6, 105}, {4, 115}}},
-//            {5,{{16, 45}, {14, 51}, {12, 57}, {10, 63}, {8, 69}, {6, 75}, {4, 81}}},
-            {6,{{16, 37}, {14, 43}, {12, 49}, {10, 55}, {8, 61}, {6, 67}, {4, 73}}},
-            {7,{{16, 32}, {14, 36}, {12, 40}, {10, 44}, {8, 48}, {6, 52}, {4, 56}}},
-            {8,{{16, 28}, {14, 32}, {12, 36}, {10, 40}, {8, 44}, {6, 48}, {4, 52}}},
-            {9,{{16, 25}, {14, 27}, {12, 29}, {10, 31}, {8, 33}, {6, 35}, {4, 37}}},
-            {10,{{16, 23}, {14, 25}, {12, 27}, {10, 29}, {8, 31}, {6, 33}, {4, 35}}},
+            {12,{{6, 100}, {8, 80}, {12, 50}}},
+            {16,{{6, 80}, {8, 60}, {12, 40}}},
+            {20,{{6, 60}, {8, 40}, {12, 30}}}
+//            {4,{{16, 55}, {14, 65}, {12, 75}, {10, 85}, {8, 95}}},
+//            {5,{{16, 45}, {14, 51}, {12, 57}, {10, 63}, {8, 69}}},
+//            {6,{{16, 37}, {14, 43}, {12, 49}, {10, 55}, {8, 61}}},
+//            {7,{{16, 32}, {14, 36}, {12, 40}, {10, 44}, {8, 48}}},
+//            {8,{{16, 28}, {14, 32}, {12, 36}, {10, 40}, {8, 44}}},
+//            {9,{{16, 25}, {14, 27}, {12, 29}, {10, 31}, {8, 33}}},
+//            {10,{{16, 23}, {14, 25}, {12, 27}, {10, 29}, {8, 31}}}
     };
 
     std::vector<report_map> reports;
@@ -1181,7 +1196,7 @@ void synth_cs_conf4()
             for (auto pair: pairs)
             {
                 auto coef = pair.first;
-                if (coef <= 6)
+                if (coef >= 8)
                     continue;
 
                 auto cells_count = pair.second;
@@ -1194,7 +1209,8 @@ void synth_cs_conf4()
                 synth_parameters->value_length = m;
                 synth_parameters->address_length = 600;
                 synth_parameters->cells_count = cells_count*1000*1000;
-                synth_parameters->max_arrays = 25*1000;
+                synth_parameters->max_arrays = 200*1000;
+                synth_parameters->step = 10*1000;
 
                 synth_runner.set_parameters(synth_parameters);
 
@@ -1207,6 +1223,153 @@ void synth_cs_conf4()
 
     std::ofstream synth_jaeckel_file;
     synth_jaeckel_file.open(reports_root + "/synth_cs_conf4.txt");
+    save_report_vector_json(&reports, synth_jaeckel_file);
+
+    synth_jaeckel_file.close();
+    delete(synth_parameters);
+}
+
+void synth_cs_conf4_mixed()
+{
+    Runners::SynthRunnerParameters* synth_parameters = get_synth_parameters();
+    uint mask_lengths[] = {4};
+
+    std::vector<std::pair<short, int>> pairs = {
+            {150, 40},
+//            {120, 60},
+//            {100, 80},
+//            {75, 100},
+    };
+
+    std::vector<report_map> reports;
+    for (auto mask_length: mask_lengths)
+    {
+        for (auto pair: pairs)
+        {
+            auto m = pair.first;
+            auto cells_count = pair.second;
+
+            Runners::SynthRunner synth_runner{};
+
+            synth_parameters->mask_length = mask_length;
+            synth_parameters->num_ones = 0;
+            synth_parameters->value_length = m;
+            synth_parameters->address_length = 600;
+            synth_parameters->cells_count = cells_count*1000*1000;
+            synth_parameters->knots = {30*1000, 60*1000, 90*1000, 120*1000, 150*1000};
+
+            synth_runner.set_parameters(synth_parameters);
+
+            report_map jaeckel_report = synth_runner.cs_conf4_mixed(data_root, output_root);
+            reports.push_back(jaeckel_report);
+            print_report(&jaeckel_report);
+        }
+    }
+
+    std::ofstream synth_cs_conf4_mixed_file;
+    synth_cs_conf4_mixed_file.open(reports_root + "/synth_cs_conf4_mixed.txt");
+    save_report_vector_json(&reports, synth_cs_conf4_mixed_file);
+
+    synth_cs_conf4_mixed_file.close();
+    delete(synth_parameters);
+}
+
+void synth_cs_reverse()
+{
+    Runners::SynthRunnerParameters* synth_parameters = get_synth_parameters();
+    uint mask_lengths[] = {175, 225, 275, 325, 350};
+    uint num_ones_arr[] = {12, 16, 20};
+
+    std::map<int, std::vector<std::pair<short, int>>> map = {
+            {12,{{8, 50}, {12, 40}, {6, 60}}},
+            {16,{{8, 40}, {12, 30}, {6, 50}}},
+            {20,{{8, 30}, {12, 20}, {6, 40}}}
+//            {4,{{16, 55}, {14, 65}, {12, 75}, {10, 85}, {8, 95}}},
+//            {5,{{16, 45}, {14, 51}, {12, 57}, {10, 63}, {8, 69}}},
+//            {6,{{16, 37}, {14, 43}, {12, 49}, {10, 55}, {8, 61}}},
+//            {7,{{16, 32}, {14, 36}, {12, 40}, {10, 44}, {8, 48}}},
+//            {8,{{16, 28}, {14, 32}, {12, 36}, {10, 40}, {8, 44}}},
+//            {9,{{16, 25}, {14, 27}, {12, 29}, {10, 31}, {8, 33}}},
+//            {10,{{16, 23}, {14, 25}, {12, 27}, {10, 29}, {8, 31}}}
+    };
+
+    std::vector<report_map> reports;
+    for (auto mask_length: mask_lengths)
+    {
+        for (auto num_ones: num_ones_arr)
+        {
+            auto pairs = map[num_ones];
+            for (auto pair: pairs)
+            {
+                auto coef = pair.first;
+
+                auto cells_count = pair.second;
+                auto m = coef*num_ones;
+
+                Runners::SynthRunner synth_runner{};
+
+                synth_parameters->knots = {2*1000, 4*1000, 6*1000, 8*1000, 10*1000};
+                synth_parameters->mask_length = mask_length;
+                synth_parameters->num_ones = num_ones;
+                synth_parameters->value_length = m;
+                synth_parameters->address_length = 600;
+                synth_parameters->cells_count = cells_count * 1000*1000;
+                synth_parameters->max_arrays = 200*1000;
+                synth_parameters->step = 10*1000;
+
+                synth_runner.set_parameters(synth_parameters);
+
+                report_map jaeckel_report = synth_runner.cs_conf_reverse(data_root, output_root);
+                reports.push_back(jaeckel_report);
+                print_report(&jaeckel_report);
+            }
+        }
+    }
+
+    std::ofstream synth_jaeckel_file;
+    synth_jaeckel_file.open(reports_root + "/synth_cs_sdm_reverse.txt");
+    save_report_vector_json(&reports, synth_jaeckel_file);
+
+    synth_jaeckel_file.close();
+    delete(synth_parameters);
+}
+
+void synth_cs_reverse_nat()
+{
+    Runners::SynthRunnerParameters* synth_parameters = get_synth_parameters();
+    uint mask_lengths[] = {175, 200, 225, 250, 275, 300};
+    std::vector<uint> knots = {1000, 2000, 3000, 4000, 5000};
+
+    std::vector<std::pair<int, int>> pairs = {{150, 40}, {100, 50}, {75, 60}};
+
+    std::vector<report_map> reports;
+    for (auto mask_length: mask_lengths)
+    {
+        for (auto pair: pairs)
+        {
+            auto m = pair.first;
+            auto cells_count = pair.second;
+
+            Runners::SynthRunner synth_runner{};
+
+            synth_parameters->mask_length = mask_length;
+            synth_parameters->value_length = m;
+            synth_parameters->address_length = 600;
+            synth_parameters->cells_count = cells_count * 1000*1000;
+            synth_parameters->max_arrays = 5000;
+            synth_parameters->step = 1000;
+            synth_parameters->knots = knots;
+
+            synth_runner.set_parameters(synth_parameters);
+
+            report_map jaeckel_report = synth_runner.cs_conf_reverse_nat(data_root, output_root);
+            reports.push_back(jaeckel_report);
+            print_report(&jaeckel_report);
+        }
+    }
+
+    std::ofstream synth_jaeckel_file;
+    synth_jaeckel_file.open(reports_root + "/synth_cs_sdm_reverse_nat.txt");
     save_report_vector_json(&reports, synth_jaeckel_file);
 
     synth_jaeckel_file.close();
@@ -1249,7 +1412,7 @@ void nat_jaeckel()
     synth_parameters->mask_length = 3;
     synth_parameters->cells_count = 8 * 1000 * 1000;
     synth_parameters->step = 250;
-    synth_parameters->max_arrays = 5000;
+    synth_parameters->max_arrays = 250;
 
     synth_runner.set_parameters(synth_parameters);
 
@@ -1270,7 +1433,7 @@ void nat_cs()
     Runners::SynthRunnerParameters* synth_parameters = get_synth_parameters();
     uint mask_lengths[] = {3};
 
-    std::vector<std::pair<int, int>> pairs = {{150, 28}};//{{100, 36}, {75, 45}, {60, 52}};
+    std::vector<std::pair<int, int>> pairs = {{150, 25}, {100, 40}, {75, 45}, {60, 50}};
 
     std::vector<report_map> reports;
     for (auto mask_length: mask_lengths)
@@ -1299,6 +1462,46 @@ void nat_cs()
 
     std::ofstream synth_jaeckel_file;
     synth_jaeckel_file.open(reports_root + "/nat_cs.txt");
+    save_report_vector_json(&reports, synth_jaeckel_file);
+
+    synth_jaeckel_file.close();
+    delete(synth_parameters);
+}
+
+void nat_cs_alpha()
+{
+    Runners::SynthRunnerParameters* synth_parameters = get_synth_parameters();
+    uint mask_lengths[] = {3};
+
+    std::vector<std::pair<int, int>> pairs = {{60, 50}, {75, 45}, {100, 35}, {150, 25}};
+
+    std::vector<report_map> reports;
+    for (auto mask_length: mask_lengths)
+    {
+        for (auto pair: pairs)
+        {
+            auto cells_count = pair.second;
+            auto m = pair.first;
+
+            Runners::SynthRunner synth_runner{};
+
+            synth_parameters->mask_length = mask_length;
+            synth_parameters->value_length = m;
+            synth_parameters->address_length = 626;
+            synth_parameters->cells_count = cells_count*1000*1000;
+            synth_parameters->max_arrays = 5000;
+            synth_parameters->step = 250;
+
+            synth_runner.set_parameters(synth_parameters);
+
+            report_map jaeckel_report = synth_runner.cs_nat_alpha(data_root, output_root);
+            reports.push_back(jaeckel_report);
+            print_report(&jaeckel_report);
+        }
+    }
+
+    std::ofstream synth_jaeckel_file;
+    synth_jaeckel_file.open(reports_root + "/nat_cs_alpha.txt");
     save_report_vector_json(&reports, synth_jaeckel_file);
 
     synth_jaeckel_file.close();
@@ -1397,8 +1600,8 @@ int main(int argc, char** argv)
     output_root = argv[3];
     std::string experiment_num = argv[4];
     int experiment_num_int = std::stoi(experiment_num);
-    if (experiment_num_int < 1 || experiment_num_int > 26)
-        throw std::invalid_argument("Only {1,...,26} experiments are available now");
+    if (experiment_num_int < 1 || experiment_num_int > 30)
+        throw std::invalid_argument("Only {1,...,30} experiments are available now");
 
     typedef std::pair < std::string, std::function<void(void)>> test_type;
     std::vector<test_type> tests;
@@ -1520,6 +1723,22 @@ int main(int argc, char** argv)
     if (experiment_num_int == 26)
     {
         tests.emplace_back( "CS3 natural", nat_cs3 );
+    }
+    if (experiment_num_int == 27)
+    {
+        tests.emplace_back( "CS natural alpha", nat_cs_alpha );
+    }
+    if (experiment_num_int == 28)
+    {
+        tests.emplace_back( "CS reverse synth", synth_cs_reverse );
+    }
+    if (experiment_num_int == 29)
+    {
+        tests.emplace_back( "CS reverse nat", synth_cs_reverse_nat );
+    }
+    if (experiment_num_int == 30)
+    {
+        tests.emplace_back( "CS synth mixed", synth_cs_conf4_mixed );
     }
 
     std::cout.precision(6);

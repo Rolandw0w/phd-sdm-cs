@@ -13,6 +13,10 @@ long get_current_time_millis()
             .count();
 }
 
+void sort(std::vector<short>& arr)
+{
+    std::sort(arr.begin(), arr.end());
+}
 
 uint hamming_distance(bool* x, bool* y, uint dim)
 {
@@ -44,16 +48,6 @@ uint from_bits(const bool *bits, uint bits_num)
 			number += (1 << (bits_num - 1 - i));
 	}
 	return number;
-}
-
-bool* to_bits(int num, uint dim)
-{
-	bool* bits = (bool*)malloc(dim * sizeof(bool));
-	for (uint i = 0; i < dim; i++)
-	{
-		bits[dim - 1 - i] = (num >> i) & 1;
-	}
-	return bits;
 }
 
 bool* noise(const bool* value, const uint length, const double probability)

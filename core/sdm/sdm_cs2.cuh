@@ -1,7 +1,10 @@
 #ifndef sdm_cs2_cuh
 #define sdm_cs2_cuh
 
+#include <thread>
+
 #include "sdm_base.cuh"
+#include "../utils/utils.hpp"
 
 
 template<typename cell_type, typename index_type, typename summation_type, typename value_type>
@@ -30,6 +33,8 @@ public:
     int write(const value_type* value, const bool* address);
     int write(const value_type* value, const bool* address, double mult);
 
+    std::vector<std::vector<cell_type>> get_whisker_boxes();
+
     cell_type get_min_activations();
     cell_type get_max_activations();
 
@@ -50,9 +55,11 @@ SDM_CS2<cell_type, index_type, summation_type, value_type>::SDM_CS2(uint K, uint
 
     thread_count = this->block_count * this->threads_per_block;
 
-    cuda_malloc(&cells, N * (M + 1));
-    cuda_malloc(&indices, K * N);
-    cuda_malloc(&bits, K * N);
+    long long N_ = N;
+
+    cuda_malloc(&cells, N_ * (M + 1));
+    cuda_malloc(&indices, N_ * K);
+    cuda_malloc(&bits, N_ * K);
 
     kernel_decorator(
             init_jaeckel_ones<cell_type, index_type>,
@@ -60,7 +67,7 @@ SDM_CS2<cell_type, index_type, summation_type, value_type>::SDM_CS2(uint K, uint
             cells, indices, bits, K, L, M, N, thread_count
     );
     if (mask_indices != NULL)
-        cuda_memcpy_to_gpu(indices, mask_indices, K*N);
+        cuda_memcpy_to_gpu(indices, mask_indices, N_ * K);
 }
 
 template<typename cell_type, typename index_type, typename summation_type, typename value_type>
@@ -122,9 +129,9 @@ double* SDM_CS2<cell_type, index_type, summation_type, value_type>::read(const b
             block_count, threads_per_block, true,
             cells, cuda_activation_indices, M, cuda_activation_counter, cuda_sum_act, thread_count
     );
-    double* sum_act = (double*) malloc(1 * sizeof(double));
-    cuda_memcpy_from_gpu(sum_act, cuda_sum_act, 1);
-    double sum_activated = sum_act[0];
+//    double* sum_act = (double*) malloc(1 * sizeof(double));
+//    cuda_memcpy_from_gpu(sum_act, cuda_sum_act, 1);
+//    double sum_activated = sum_act[0];
 
     kernel_decorator(
             read_cs1_v3<cell_type, index_type, summation_type>,
@@ -136,12 +143,10 @@ double* SDM_CS2<cell_type, index_type, summation_type, value_type>::read(const b
     cuda_memcpy_from_gpu(result, cuda_sum, M);
 
     for (int i = 0; i < M; i++)
-        if (abs(sum_activated) < 1e-6)
-            result[i] = 0.0;
-        else result[i] /= sum_activated;
+        result[i] /= activation_counter[0];
 
     free(activation_counter);
-    free(sum_act);
+//    free(sum_act);
 
     cuda_free(cuda_activation_counter);
     cuda_free(cuda_activation_indices);
@@ -222,6 +227,42 @@ int SDM_CS2<cell_type, index_type, summation_type, value_type>::write(const valu
     free(activation_counter);
 
     return activated_cells_number;
+}
+
+template<typename cell_type, typename index_type, typename summation_type, typename value_type>
+std::vector<std::vector<cell_type>> SDM_CS2<cell_type, index_type, summation_type, value_type>::get_whisker_boxes()
+{
+    long long size = (long long) N * (M + 1);
+    auto host_cells = (cell_type*) malloc(size * sizeof(cell_type));
+    cuda_memcpy_from_gpu(host_cells, cells, size);
+
+    std::vector<std::vector<cell_type>> result(M + 1);
+
+    std::vector<std::thread> threads;
+    threads.reserve((M + 1));
+
+    std::vector<std::vector<cell_type>> arrs(M + 1);
+
+    for (int i = 0; i < M + 1; i++)
+    {
+        std::vector<cell_type> arr(N);
+        for (int j = 0; j < N; j++)
+            arr[j] = host_cells[i + j*(M+1)];
+        arrs[i] = arr;
+        std::thread thread_obj(SortClass<std::vector<cell_type>>(), std::ref(arrs[i]));
+        threads.push_back(std::move(thread_obj));
+    }
+    free(host_cells);
+
+    for (int i = 0; i < M + 1; i++)
+        threads[i].join();
+
+    for (int i = 0; i < M + 1; i++)
+    {
+        auto w_box = whisker_box_sorted(arrs[i]);
+        result[i] = w_box;
+    }
+    return result;
 }
 
 template<typename cell_type, typename index_type, typename summation_type, typename value_type>

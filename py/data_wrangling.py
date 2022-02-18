@@ -33,6 +33,20 @@ def get_features(features_bin_path, left_slice: int = None) -> np.ndarray:
 
         if left_slice:
             return data_np[:, :left_slice]
+        # s = np.sum(data_np, axis=1).tolist()
+        # ss = [(i, s[i]) for i in range(600)]
+        # sss = sorted(ss, key=lambda x: -x[1])
+        return data_np
+
+
+def get_features_from_txt(features_bin_path, left_slice: int = None) -> np.ndarray:
+    data_np = np.zeros((626, 9_000))
+    with open(features_bin_path, "r") as f_read:
+        content = f_read.read()
+        for i, char in enumerate(content):
+            index_1 = i % 626
+            index_2 = i // 626
+            data_np[index_1, index_2] = int(content[i])
         return data_np
 
 
@@ -64,3 +78,47 @@ def round_to_odd_or_even(num: float, num_ones: int):
 
 def round_to_odd_or_even_arr(array: np.ndarray, num_ones: int):
     return np.vectorize(partial(round_to_odd_or_even, num_ones=num_ones))(array)
+
+
+def get_cifar10_img():
+    def unpickle(file: str):
+        import pickle
+        with open(file, 'rb') as fo:
+            d = pickle.load(fo, encoding='bytes')
+        return d
+
+    dd = {}
+    ddd = {}
+    for i in range(1, 6):
+        path = f"/home/rolandw0w/Development/PhD/data/cifar-10/np/data_batch_{i}"
+        d = unpickle(path)
+        dat = d[b"data"]
+        X = dat.reshape(10000, 3, 32, 32).transpose(0,2,3,1).astype("uint8")
+        from matplotlib import pyplot as plt
+        fig, axes1 = plt.subplots(5,5,figsize=(3,3))
+        for j in range(5):
+            for k in range(5):
+                i = np.random.choice(range(len(X)))
+                axes1[j][k].set_axis_off()
+                axes1[j][k].imshow(X[i:i+1][0])
+        plt.show()
+
+        file_names = d[b"filenames"]
+        file_names = file_names#[file_name.decode().split("_")[-1] for file_name in file_names]
+        fns = [file_name.decode().split("_")[-1] for file_name in file_names]
+        for fn in fns:
+            ddd.setdefault(fn, 0)
+            ddd[fn] += 1
+        for j in range(10_000):
+            dd[file_names[j]] = (d[b"labels"][j], d[b"data"][j])
+    l = [None] * len(dd)
+
+
+    for k, v in dd.items():
+        n = int(k.split(".")[0])
+        l[n] = v
+
+    print(dd)
+
+
+# get_cifar10_img()

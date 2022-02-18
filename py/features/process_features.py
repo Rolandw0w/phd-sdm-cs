@@ -2,8 +2,17 @@ import argparse
 import json
 import logging
 import os
+import string
+
 from collections import Counter
 
+import gensim.downloader as api
+from gensim.models import Word2Vec
+import numpy as np
+from sklearn.cluster import KMeans
+
+
+text8_corpus = api.load('text8')
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s: %(message)s')
 logger = logging.getLogger("FEATURE_PROCESSING")
@@ -40,6 +49,31 @@ def filter_labels(input_path: str, score_threshold):
 def process(features_path: str, score_threshold: float, non_zero_images: int, output_path: str, max_features: int = None):
     image_descriptions, labels = filter_labels(features_path, score_threshold)
 
+    dd = [None] * len(image_descriptions)
+    for k, v in image_descriptions.items():
+        dd[v] = k
+    dd = dd[:600]
+    letters = string.ascii_uppercase
+
+    # model = Word2Vec(text8_corpus, min_count=1, vector_size=100, workers=13, window=3, sg=1)
+    # sims = np.zeros((600, 600))
+    # for i in range(600 - 1):
+    #     for j in range(i + 1, 600):
+    #         sim = model.wv.similarity(dd[i][0], dd[j][0])
+    #         sims[i, j] = sim
+    #         sims[j, i] = sim
+    #     sims[i, i] = 1.0
+    # sims[599, 599] = 1.0
+    #
+    # k_means = KMeans(n_clusters=40, random_state=0)
+    # k_means.fit(model.wv.vectors)
+    # m = {}
+    # clusters = k_means.predict(model.wv.vectors)
+    #
+    # for i in range(600):
+    #     cluster = clusters[i]
+    #     m.setdefault(cluster, [])
+    #     m[cluster].append(dd[i][0])
     numbers = sorted([int(x) for x in labels.keys()])
 
     min_number = min(numbers)
@@ -47,13 +81,30 @@ def process(features_path: str, score_threshold: float, non_zero_images: int, ou
 
     non_zeros = 0
     bytes_list = []
+
+    code_ones = []
+    codex_ones = []
+    codexs = []
     for image_number in range(min_number, max_number + 1):
         code = ["0"] * len(image_descriptions)
         image_labels = labels.get(str(image_number), [])
+        feats = []
         for image_label in image_labels:
-            index = image_descriptions.get(image_label["description"], None)
+            feature = image_label["description"]
+            index = image_descriptions.get(feature, None)
             if index is not None:
+                feats.append(feature)
                 code[index] = "1"
+        code2 = code.copy()[:600]
+        codex = code.copy()[:600]
+
+        for idx, letter in enumerate(letters):
+            for feature in feats:
+                if feature.startswith(letter):
+                    codex.append("1")
+                    break
+            else:
+                codex.append("0")
 
         counter = Counter(code)
         if counter.get("1", 0) > 1:
@@ -61,26 +112,55 @@ def process(features_path: str, score_threshold: float, non_zero_images: int, ou
         else:
             continue
 
-        code += ["0"] * (8 - len(code) % 8)
-        max_features = max_features or len(code)
-        for i in range(0, max_features, 8):
-            code_byte = "".join(code[i:i+8])
-            code_byte_int = int(code_byte, 2)
-            bytes_to_write = code_byte_int.to_bytes(1, byteorder="big", signed=False)
-            bytes_list.append(bytes_to_write)
+        code_ones_i = len([x for x in code2 if x == "1"])
+        code_ones += [code_ones_i]
+        codex_ones_i = len([x for x in codex if x == "1"])
+        codex_ones += [codex_ones_i]
 
+        # code += ["0"] * (8 - len(code) % 8)
+        # max_features = max_features or len(code)
+        # for i in range(0, max_features, 8):
+        #     code_byte = "".join(code[i:i+8])
+        #     code_byte_int = int(code_byte, 2)
+        #     bytes_to_write = code_byte_int.to_bytes(1, byteorder="big", signed=False)
+        #     bytes_list.append(bytes_to_write)
+        #
+        codexs.append(codex)
         if non_zeros == non_zero_images:
             break
 
-    if len(bytes_list) < non_zero_images:
-        msg = "Only {} images with at least one feature were processed (minimum {} was required)".format(
-            len(bytes_list), non_zero_images
-        )
-        logger.error(msg)
-        exit(1)
 
-    with open(output_path, "wb") as f_output:
-        output = b"".join(bytes_list)
+    code_d = {}
+    codex_d = {}
+    for i in range(len(codex_ones)):
+        code_d.setdefault(code_ones[i], 0)
+        code_d[code_ones[i]] += 1
+        codex_d.setdefault(codex_ones[i], 0)
+        codex_d[codex_ones[i]] += 1
+
+    x1 = np.array(list(range(21)))
+    x2 = x1
+    y1 = [code_d.get(x, 0) for x in x1]
+    y2 = [codex_d.get(x, 0) for x in x2]
+
+    # from matplotlib import pyplot as plt
+    #
+    # plt.xticks(x1, labels=[str(x) for x in x1])
+    #
+    # plt.bar(x1-0.2, y1, width=0.4)
+    # plt.bar(x2+0.2, y2, width=0.4)
+    # plt.show()
+    c = len(codexs)
+
+    # if len(bytes_list) < non_zero_images:
+    #     msg = "Only {} images with at least one feature were processed (minimum {} was required)".format(
+    #         len(bytes_list), non_zero_images
+    #     )
+    #     logger.error(msg)
+    #     exit(1)
+
+    with open("/home/rolandw0w/Development/PhD/data/features.txt", "w") as f_output:
+        output = "".join(["".join(x) for x in codexs])
         f_output.write(output)
         logger.info(f"Features were successfully saved to {output_path}")
 

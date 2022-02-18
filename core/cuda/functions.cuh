@@ -51,9 +51,9 @@ inline void kernel_decorator(Kernel kernel, int block_count, int threads_per_blo
 }
 
 template<typename T>
-void cuda_malloc(T** cuda_ptr, ulong size, bool ignore_sizeof = false, bool synchronize_device = DEFAULT_SYNCHRONIZE_DEVICE)
+void cuda_malloc(T** cuda_ptr, long long size, bool ignore_sizeof = false, bool synchronize_device = DEFAULT_SYNCHRONIZE_DEVICE)
 {
-    ulong bytes = ignore_sizeof ? size : size*sizeof(T);
+    long long bytes = ignore_sizeof ? size : size*sizeof(T);
     GPUErrorCheck(cudaMalloc((void**)cuda_ptr, bytes), synchronize_device);
 }
 
@@ -72,18 +72,18 @@ void cuda_memcpy_to_gpu(T* cuda_ptr, const T* ptr, ulong size, bool ignore_sizeo
 }
 
 template<typename T>
-void cuda_memcpy_from_gpu(T* ptr, T* cuda_ptr, ulong size, bool ignore_sizeof = false, bool synchronize_device = DEFAULT_SYNCHRONIZE_DEVICE)
+void cuda_memcpy_from_gpu(T* ptr, T* cuda_ptr, long long size, bool ignore_sizeof = false, bool synchronize_device = DEFAULT_SYNCHRONIZE_DEVICE)
 {
-    ulong bytes = ignore_sizeof ? size : size*sizeof(T);
+    long long bytes = ignore_sizeof ? size : size*sizeof(T);
     GPUErrorCheck(cudaMemcpy(ptr, cuda_ptr, bytes, cudaMemcpyDeviceToHost), synchronize_device);
 }
 
-template<typename T>
-void cuda_memcpy_from_gpu(T* ptr, const T* cuda_ptr, ulong size, bool ignore_sizeof = false, bool synchronize_device = DEFAULT_SYNCHRONIZE_DEVICE)
-{
-    ulong bytes = ignore_sizeof ? size : size*sizeof(T);
-    GPUErrorCheck(cudaMemcpy(ptr, cuda_ptr, bytes, cudaMemcpyDeviceToHost), synchronize_device);
-}
+//template<typename T>
+//void cuda_memcpy_from_gpu(T* ptr, const T* cuda_ptr, ulong size, bool ignore_sizeof = false, bool synchronize_device = DEFAULT_SYNCHRONIZE_DEVICE)
+//{
+//    ulong bytes = ignore_sizeof ? size : size*sizeof(T);
+//    GPUErrorCheck(cudaMemcpy(ptr, cuda_ptr, bytes, cudaMemcpyDeviceToHost), synchronize_device);
+//}
 
 template<typename T>
 void cuda_free(T* cuda_ptr, bool synchronize_device = DEFAULT_SYNCHRONIZE_DEVICE)

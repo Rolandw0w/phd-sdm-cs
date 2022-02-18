@@ -1,6 +1,7 @@
 #ifndef utils_h
 #define utils_h
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <random>
@@ -21,7 +22,16 @@ bool* strict_address_detector(const bool *value, uint dim);
 
 uint from_bits(const bool *bits, uint bits_num);
 
-bool* to_bits(int num, uint dim);
+template<typename T>
+bool* to_bits(T num, uint dim)
+{
+    bool* bits = (bool*)malloc(dim * sizeof(bool));
+    for (uint i = 0; i < dim; i++)
+    {
+        bits[dim - 1 - i] = (num >> i) & 1;
+    }
+    return bits;
+}
 
 bool* noise(const bool* value, uint length, double probability);
 bool* noise(const bool* value, uint length, uint error_num);
@@ -58,6 +68,16 @@ T median(T* arr, int size)
 		return (arr[size / 2] + arr[size / 2 - 1]) / 2;
 	}
 	return arr[size / 2];
+}
+
+template<typename T>
+T max(T* arr, int size)
+{
+    T m = arr[0];
+    for (int i = 1; i < size; i++)
+        if (m < arr[i])
+            m = arr[i];
+    return m;
 }
 
 template<typename T>
@@ -133,4 +153,53 @@ bool* get_sparse_array(std::vector<T>& ones_indices, int length)
     }
     return sparse_array;
 }
+
+template<typename Array>
+void sort(Array& arr)
+{
+    std::sort(arr.begin(), arr.end());
+}
+
+template<typename Array>
+class SortClass
+{
+public:
+    void operator()(Array& arr);
+};
+
+template<typename Array>
+void SortClass<Array>::operator()(Array& arr)
+{
+    sort(arr);
+}
+
+template<typename T>
+std::vector<T> whisker_box_sorted(std::vector<T>& arr)
+{
+    std::vector<T> result(5);
+
+    auto const q0 = 0;
+    auto const q1 = arr.size() / 4;
+    auto const q2 = arr.size() / 2;
+    auto const q3 = q1 + q2;
+    auto const q4 = arr.size() - 1;
+
+    result[0] = arr[q0];
+    result[1] = arr[q1];
+    result[2] = arr[q2];
+    result[3] = arr[q3];
+    result[4] = arr[q4];
+
+    return result;
+}
+
+template<typename T>
+std::vector<double> whisker_box(std::vector<T>& arr)
+{
+    sort(arr);
+    std::vector<double> result = whisker_box_sorted(arr);
+
+    return result;
+}
+
 #endif // !utils_h

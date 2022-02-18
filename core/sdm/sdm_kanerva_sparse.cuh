@@ -206,6 +206,8 @@ ulong SDM_KANERVA_SPARSE<cell_type, index_type, summation_type>::write(const boo
     cuda_memcpy_from_gpu(activation_counter, cuda_activation_counter, 1);
     int activated_cells_number = activation_counter[0];
 
+    //std::cout << activated_cells_number << std::endl;
+
     if (activated_cells_number == 0)
     {
         free(activation_counter);

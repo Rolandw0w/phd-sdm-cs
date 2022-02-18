@@ -99,6 +99,24 @@ void init_jaeckel_ones(cell_type* cells, index_type* indices, bool* bits, uint K
 }
 
 
+template<typename cell_type>
+__global__
+void init_cs_sdm(cell_type* cells, uint M, uint N, int thread_count)
+{
+    int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
+    curandState state;
+    curand_init(thread_num, 0, 0, &state);
+
+    for (uint i = thread_num; i < N; i += thread_count)
+    {
+        for (uint j = 0; j < M + 1; j++)
+        {
+            cells[i*(M + 1) + j] = 0;
+        }
+    }
+}
+
+
 template<typename cell_type, typename index_type>
 __global__
 void init_jaeckel_zeroes(cell_type* cells, index_type* indices, bool* bits, uint K, uint L, uint M, uint N, int thread_count)
@@ -356,6 +374,76 @@ void get_activated_cells(index_type* indices, bool* bits, uint K, uint M, uint N
 	}
 }
 
+//template<typename index_type>
+//__device__
+//bool is_activated_reverse(index_type* indices, int cell_num, uint K, uint L, bool* destination_address)
+//{
+//    uint num = L / 8;
+//    long long cell_ind = (long long) cell_num*num;
+//    short c = 0;
+//
+//    for (int j = 0; j < num; j++)
+//    {
+//        index_type index = indices[cell_ind + j];
+//        for (int b = 7; b >= 0; b--)
+//        {
+//            bool is = index & (1 << b);
+//            if (!is)
+//            {
+//                int addr_ind = 8*j + 7 - b;
+////                if (cell_num == 0)
+////                    printf("%d %d %d %d %d %d %d %d %d\n", cell_num, is, index, b, cell_ind, L, num, addr_ind, destination_address[addr_ind]);
+//                if (destination_address[addr_ind])
+//                    return false;
+//            }
+//        }
+//    }
+//    return true;
+//}
+
+template<typename index_type>
+__device__
+bool is_activated_reverse(index_type* indices, int cell_num, uint K, uint L, bool* destination_address)
+{
+    uint num = L / 8;
+    long long cell_ind = (long long) cell_num*num;
+    short addr_ind = 0;
+
+    for (int j = 0; j < num; j++)
+    {
+        index_type index = indices[cell_ind + j];
+        int s = 0;
+        for (int b = 7; b >= 0; b--)
+        {
+            bool mask_bit = index & (1 << b);
+            s =  s + (!mask_bit & destination_address[addr_ind]);
+            addr_ind++;
+        }
+        if (s > 0)
+            return false;
+    }
+    return true;
+}
+
+
+template<typename index_type>
+__global__
+void get_activated_cells_reverse(index_type* indices, uint K, uint L, uint N,
+                                 int thread_count, bool* destination_address, int* activated_indices, int* counter)
+{
+    int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
+    for (int i = thread_num; i < N; i += thread_count)
+    {
+        bool activated = is_activated_reverse(indices, i, K, L, destination_address);
+        if (activated)
+        {
+            int old = atomicAdd(&counter[0], 1);
+            activated_indices[old] = i;
+        }
+        //printf("%d %d %d\n", thread_num, i, activated);
+    }
+}
+
 template<typename dist_type>
 __device__
 bool is_activated_kanerva(bool* addresses, bool* destination_address, uint i, uint L, uint d)
@@ -405,6 +493,7 @@ bool is_activated_kanerva_sparse(index_type* indices, bool* destination_address,
     index_type match = K - dist;
     index_type hamming_distance = dist + (num_ones - match);
     bool is_activated = hamming_distance <= d;
+    //printf("%d %d %d %d %d\n", K, dist, match, hamming_distance, is_activated);
     return is_activated;
 }
 
@@ -435,10 +524,11 @@ void read_jaeckel(cell_type* cells, int* activated_indices, uint M, int thread_c
 	{
 		for (int i = 0; i < activated_cells_number; i++)
 		{
-			int activated_index = activated_indices[i];
+			long long activated_index = activated_indices[i];
+            long long base = activated_index * (M + 1);
 			for (int j = thread_num; j < M; j += thread_count)
 			{
-				sum[j] += cells[activated_index * (M + 1) + j];
+				sum[j] += cells[base + j];
 			}
 		}
 		//printf("%d %d\n", thread_num, sum[thread_num]);
@@ -524,10 +614,35 @@ void read_cs1_v3(cell_type* cells, int* activated_indices, uint M, int thread_co
     {
         long long activated_index = activated_indices[i];
         long long cell_start = activated_index * (M + 1);
+        long long writes_num_index = cell_start + M;
+        double writes_num = cells[writes_num_index];
         for (int j = 0; j < M; j++)
         {
             long long cell_index = cell_start + j;
-            atomicAdd(&sum[j], (double) cells[cell_index]);
+            atomicAdd(&sum[j], ((double) cells[cell_index])/writes_num);
+        }
+    }
+}
+
+template<typename cell_type, typename index_type, typename summation_type>
+__global__
+void read_cs1_v4(cell_type* cells, int* activated_indices, uint M, int thread_count, double* sum, int* activation_counter)
+{
+    int activated_cells_number = activation_counter[0];
+    int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
+
+    for (int i = thread_num; i < activated_cells_number; i += thread_count)
+    {
+        long long activated_index = activated_indices[i];
+        long long cell_start = activated_index * (M + 1);
+        long long writes_num_index = cell_start + M;
+        double writes_num = cells[writes_num_index];
+        if (writes_num == 0.0)
+            continue;
+        for (int j = 0; j < M; j++)
+        {
+            long long cell_index = cell_start + j;
+            atomicAdd(&sum[j], ((double) cells[cell_index])/writes_num);
         }
     }
 }
@@ -769,8 +884,9 @@ void get_thresholds(cell_type* cells, int* cell_indices, int indices_count,
 
 	for (int i = thread_num; i < indices_count; i += thread_count)
 	{
-		int cell_index = cell_indices[i];
-		thresholds[i] = cells[cell_index *(M+1) + M] * (p1 - p0);
+        long long cell_index = cell_indices[i];
+        long long ind = cell_index *(M+1) + M;
+		thresholds[i] = cells[ind] * (p1 - p0);
 	}
 }
 
@@ -828,26 +944,27 @@ void generate_small_random_matrix(int rows, int columns, T* matrix)
 
 template <typename T>
 __global__
-void mult_matrix(bool* left, bool* right, T* result, int left_rows, int left_columns, int right_columns,
+void mult_matrix(bool* left, bool* right, T* result, long long left_rows, long long left_columns, long long right_columns,
                  int thread_count)
 {
     int thread_num = blockIdx.x * blockDim.x + threadIdx.x;
 
-    for (int i = thread_num; i < left_rows*right_columns; i += thread_count)
+    for (long long i = thread_num; i < left_rows*right_columns; i += thread_count)
     {
         T tmp_sum = 0;
-        int left_row = i / right_columns;
-        int right_column = i % right_columns;
+        long long left_row = i / right_columns;
+        long long right_column = i % right_columns;
         for (int j = 0; j < left_columns; j++)
         {
-            int left_index = left_row*left_columns+j;
-            int right_index = right_column*left_columns+j;
+            long long left_index = left_row*left_columns+j;
+            long long right_index = right_column*left_columns+j;
             T left_item = 2*left[left_index] - 1;
             T right_item = right[right_index];
             T to_add = left_item * right_item;
             tmp_sum += to_add;
         }
         result[i] = tmp_sum;
+        //printf("%llu %d\n", i, tmp_sum);
     }
 }
 

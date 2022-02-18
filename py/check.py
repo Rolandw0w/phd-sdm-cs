@@ -1,4 +1,5 @@
 import multiprocessing as mp
+from datetime import datetime
 
 from matplotlib import pyplot as plt
 import numpy as np
@@ -6,22 +7,24 @@ import pandas as pd
 
 import data_wrangling as dw
 from py.restore_signal import restore_cs1_signal
-from py.utils import perf_measure
+from py.utils import perf_measure, perf_measure_sklearn
 
 SYNTH_ROOT = "/home/rolandw0w/Development/PhD/output/synth"
 
 
-def read_arrays(path: str, delimiter: str = None, type_=int) -> object:
+def read_arrays(path: str, delimiter: str = None, type_=int, max_arrays: int = None) -> object:
     arrays = []
     with open(path, "r") as f:
         content = f.read()
         lines = content.split("\n")
+        if isinstance(max_arrays, int):
+            lines = lines[:max_arrays]
 
         for index, line in enumerate(lines[:-1]):
             if delimiter:
                 line = line.split(delimiter)[1]
             try:
-                array = [type_(x) for x in line.split(",")]
+                array = np.array([type_(x) for x in line.split(",")])
             except:
                 raise
             arrays.append(array)
@@ -36,7 +39,7 @@ def read_indices(path: str, delimiter: str = None) -> list:
 
         for index, line in enumerate(lines[:-1]):
             s = line.split(delimiter)[0]
-            ind = int(s)
+            ind = np.uint32(s)
             inds.append(ind)
     return inds
 
@@ -53,6 +56,7 @@ def _check(clean, restored, restored_noisy, n, s, sdm, N, k):
     fns_noisy = []
     fps_noisy = []
     exact_noisy = 0
+    print(f"{datetime.utcnow().isoformat()} Calculating metrics (n={n}):", end=" ")
     for i in range(n):
         clean_array = clean[i]
         restored_array = restored[i]
@@ -61,7 +65,7 @@ def _check(clean, restored, restored_noisy, n, s, sdm, N, k):
         key = (i, restored_array.tobytes())
         cached = CACHE.get(key)
         if cached is None:
-            fn, fp, _, _ = perf_measure(clean_array, restored_array)
+            fn, fp, _, _ = perf_measure_sklearn(clean_array, restored_array)
             CACHE[key] = (fn, fp)
         else:
             fn, fp = cached
@@ -70,7 +74,7 @@ def _check(clean, restored, restored_noisy, n, s, sdm, N, k):
         key_noisy = (i, restored_noisy_array.tobytes())
         cached_noisy = CACHE.get(key_noisy)
         if cached_noisy is None:
-            fn_noisy, fp_noisy, _, _ = perf_measure(clean_array, restored_noisy_array)
+            fn_noisy, fp_noisy, _, _ = perf_measure_sklearn(clean_array, restored_noisy_array)
             CACHE[key_noisy] = (fn_noisy, fp_noisy)
         else:
             fn_noisy, fp_noisy = cached_noisy
@@ -88,6 +92,10 @@ def _check(clean, restored, restored_noisy, n, s, sdm, N, k):
         l1s_noisy.append(l1_noisy)
         fns_noisy.append(fn_noisy)
         fps_noisy.append(fp_noisy)
+
+        if (i+1) % 20_000 == 0:
+            print(f"{(i+1)//1_000}k", end=" ")
+    print()
 
     round_num = 3
     avg_hammings = round(np.mean(l1s), round_num)

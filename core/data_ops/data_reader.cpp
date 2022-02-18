@@ -111,6 +111,7 @@ bool* get_cs1(int labels_count, int image_num, std::string& data_root)
 
     FILE* fp = fopen(path, "rb");
     fread(buffer, 1, image_num * label_size_bytes, fp);
+    fclose(fp);
 
     int index = 0;
     for (int i = 0; i < image_num * label_size_bytes; i++)
@@ -122,6 +123,27 @@ bool* get_cs1(int labels_count, int image_num, std::string& data_root)
             cs1[index] = bits[k];
             index++;
         }
+    }
+    return cs1;
+}
+
+bool* get_cs1_txt(int labels_count, int image_num, std::string& data_root)
+{
+    int bytes = labels_count * image_num;
+    bool* cs1 = (bool*)malloc(bytes * sizeof(bool));
+
+    char* buffer = (char*)malloc(bytes * sizeof(char));
+
+    std::string full_path = data_root + "/features.txt";
+    const char* path = &full_path[0];
+
+    FILE* fp = fopen(path, "r");
+    fread(buffer, 1, bytes, fp);
+    fclose(fp);
+
+    for (int i = 0; i < bytes; i++)
+    {
+        cs1[i] = buffer[i] == '1';
     }
     return cs1;
 }

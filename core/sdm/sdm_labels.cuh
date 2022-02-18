@@ -377,9 +377,9 @@ bool* SDM_LABELS<cell_type, index_type, summation_type>::read(const bool* value,
             case ReadingType::STATISTICAL:
                 read_stat(cuda_value, cuda_sum, cuda_activation_indices, activated_cells_number, cuda_thresholds);
                 break;
-                case ReadingType::BIOLOGICAL:
-                    read_bio(cuda_value, cuda_activation_indices, activated_cells_number, cuda_thresholds);
-                    break;
+            case ReadingType::BIOLOGICAL:
+                read_bio(cuda_value, cuda_activation_indices, activated_cells_number, cuda_thresholds);
+                break;
         }
 
         free(activation_counter);
